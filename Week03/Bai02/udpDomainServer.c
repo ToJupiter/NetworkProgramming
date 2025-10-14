@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define MAXLINE 1024
+#define MAXLINE 2048
 
 void resolve_domain(const char *input, char *output) {
     struct addrinfo hints, *res, *p;

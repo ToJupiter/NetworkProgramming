@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define MAXLINE 1024
+#define MAXLINE 2048
 
 int main(int argc, char *argv[]) {
     int sockfd;
