@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define MAXLINE 1024
+#define MAXLINE 4096
 #define EXIT_FAILURE 1
 #define LISTENQ 8
 #define SERV_PORT 9000
@@ -67,8 +67,19 @@ int main(int argc, char **argv){
                 printf("Resending the letters: \n");
                 send(connfd, letters, strlen(letters), 0);
             }
+            else if (digits[0] == '\0'){
+                send(connfd, letters, strlen(buffer), 0);
+            }
         }
+
+        if (n < 0){
+            perror("Read error");
+            exit(1);
+        }
+        close(connfd);
     }
+
+    close(listenfd);
 
 }
 
