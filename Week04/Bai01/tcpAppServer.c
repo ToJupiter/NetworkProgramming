@@ -1,15 +1,17 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <ctype.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 #define MAXLINE 4096
 #define EXIT_FAILURE 1
 #define LISTENQ 8
-#define SERV_PORT 9000
 
-void process_string(const char* input, char *letters, char *digits){
+int process_string(const char* input, char *letters, char *digits){
     int i = 0, l = 0, d = 0;
     int has_invalid = 0;
 
@@ -21,10 +23,7 @@ void process_string(const char* input, char *letters, char *digits){
     }
     letters[l] = '\0'; digits[d] = '\0';
 
-    if (has_invalid){
-        strcpy(letters, "Error");
-        digits[0] = '\0';
-    }
+    return has_invalid;
 }
 
 int main(int argc, char **argv){
@@ -46,7 +45,7 @@ int main(int argc, char **argv){
 
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(SERV_PORT);
+    servaddr.sin_port = htons(port);
 
     bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
     listen(listenfd, LISTENQ);
@@ -56,19 +55,19 @@ int main(int argc, char **argv){
         clilen = sizeof(cliaddr);
         connfd = accept(listenfd, (struct sockaddr*) &cliaddr, &clilen);
         printf("%s\n", "Received request...");
-        while((n = recv(connfd, buffer, MAXLINE, 0)) > 0){
-            process_string(&buffer, &letters, &digits);
+        int is_error;
+        while((n = recv(connfd, buffer, MAXLINE - 1, 0)) > 0){
+            buffer[n] = '\0';
+            is_error = process_string(buffer, letters, digits);
             printf("%s","String received from and resent to the client:");
             puts(buffer);
             
-            if (digits[0] != '\0'){
-                printf("Resending the digits: \n");
-                send(connfd, digits, strlen(digits), 0);
-                printf("Resending the letters: \n");
-                send(connfd, letters, strlen(letters), 0);
-            }
-            else if (digits[0] == '\0'){
-                send(connfd, letters, strlen(buffer), 0);
+            if (is_error){
+                send(connfd, "Error\n", 6, 0);
+            } else {
+                char response[MAXLINE * 2];
+                sprintf(response, "Digits: %s\n Letters: %s\n", digits, letters);
+                send(connfd, response, strlen(response), 0);
             }
         }
 
@@ -79,6 +78,9 @@ int main(int argc, char **argv){
         close(connfd);
     }
 
+    free(buffer);
+    free(letters);
+    free(digits);
     close(listenfd);
 
 }
