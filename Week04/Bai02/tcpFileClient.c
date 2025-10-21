@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define MAXLINE 4096
+#define MAXLINE 1000000
 
 int main(int argc, char **argv){
     if (argc != 3){
@@ -66,7 +66,7 @@ int main(int argc, char **argv){
             continue;
         }
 
-        char *buffer = malloc(MAXLINE * sizeof(MAXLINE));
+        char *buffer = malloc(MAXLINE * sizeof(char));
         while((n = fread(buffer, 1, MAXLINE, fp)) > 0){
             if (send(sockfd, buffer, n , 0) != n){
                 printf("File transfering is interupted\n");

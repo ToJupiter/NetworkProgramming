@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#define MAXLINE 4096
+#define MAXLINE 1000000
 #define UPLOAD_DIR "uploads"
 
 int file_exists(const char *filename){
@@ -55,7 +55,7 @@ int main(int argc, char **argv){
             continue;
         }
 
-        snprintf(filepath, sizeof(filepath), "%s/%s", UPLOAD_DIR, filename);
+        snprintf(filepath, MAXLINE, "%s/%s", UPLOAD_DIR, filename);
         
         if (file_exists(filepath)){
             char *error_log = "File exists on server\n";
@@ -73,7 +73,7 @@ int main(int argc, char **argv){
         }
 
         send(connfd, "OK\n", 3, 0);
-        char *buffer = malloc(sizeof(char));
+        char *buffer = malloc(MAXLINE * sizeof(char));
         while((n = recv(connfd, buffer, MAXLINE, 0)) > 0){
             fwrite(buffer, 1, n, fp);
         }
