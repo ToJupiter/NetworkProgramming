@@ -15,7 +15,7 @@ Dự án này nhằm mục đích xây dựng một nền tảng trò chơi nhi�
 
 *   **Frontend:** Sử dụng Qt Designer + Qt Framework (C++) để xây dựng giao diện ứng dụng trên máy tính (desktop).
 *   **Backend:** C++ sử dụng Socket programming để xử lý giao tiếp real-time.
-*   **Database:** SQLite kết hợp với một thư viện TinyORM (C++) để quản lý dữ liệu người dùng, thống kê trò chơi và lịch sử trận đấu.
+*   **Database:** SQLite kết hợp với một thư viện <sqlite_modern_cpp.h> (C++) để quản lý dữ liệu người dùng, thống kê trò chơi và lịch sử trận đấu.
 
 **3. Các Tính năng**
 
@@ -91,7 +91,7 @@ This project aims to build a multiplayer gaming platform simulating famous TV ga
 
 *   **Frontend:** Uses Qt Designer + Qt Framework (C++) to build the desktop application interface.
 *   **Backend:** C++ using Socket programming for real-time communication.
-*   **Database:** SQLite combined with the TinyORM library (C++) to manage user data, game statistics, and match history.
+*   **Database:** SQLite combined with the <sqlite_modern_cpp.h> library (C++) to manage user data, game statistics, and match history.
 
 **3. Features**
 
