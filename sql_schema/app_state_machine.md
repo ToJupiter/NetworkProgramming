@@ -1,4 +1,3 @@
-%%{init: {'theme':'base','themeVariables': {'primaryColor':'#f9f9f9','secondaryColor':'#e6e6e6','tertiaryColor':'#d9d9d9','fontFamily':'Arial','edgeLabelBackground':'#ffffff','textColor':'#333333'}}}%%
 stateDiagram-v2
     [*] --> Đăng nhập: Kết nối thông qua TCP
     Đăng nhập --> Đăng ký: Yêu cầu đăng ký

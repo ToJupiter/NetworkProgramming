@@ -82,6 +82,7 @@ struct LoginRequest {
 
 struct AccountUpdateRequest {
     char new_display_name[MAX_DISPLAY_NAME_LEN];
+    // may add more options to change other stats
 };
 
 struct StatusResponse {
@@ -173,6 +174,10 @@ struct PlayerRoundResult {
     uint32_t user_id;
     int32_t score_change;
     uint32_t total_score;
+    uint8_t correct_option;
+    uint32_t points_for_this_question; // Points specifically earned for this question.
+    bool was_eliminated; // For elimination mode.
+    bool answered_question; // True if player submitted an answer, false if timed out or no answer.
 };
 
 struct RoundResultNotification {
@@ -183,6 +188,7 @@ struct RoundResultNotification {
 
 struct PlayerEliminatedNotification {
     uint32_t user_id;
+    uint32_t session_id;
 };
 
 struct PlayerFinalResult {
@@ -203,6 +209,8 @@ struct UserStatsResponse {
     uint32_t total_correct_answers;
     uint32_t total_incorrect_answers;
     double average_score;
+
+    // We will need changes here based on how we calculates our score, implement later
 };
 
 struct ErrorResponse {

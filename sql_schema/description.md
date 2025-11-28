@@ -27,6 +27,7 @@ Dự án này nhằm mục đích xây dựng một nền tảng trò chơi nhi�
 **2.2. Quản lý Phòng chơi**
 *   **Tạo phòng:** Người chơi (chủ phòng) có thể tạo một phòng chơi mới, đặt tên phòng và cấu hình các tùy chọn cơ bản cho trò chơi (chế độ chơi, số lượng câu hỏi).
 *   **Tham gia phòng:** Người chơi khác có thể thấy danh sách các phòng đang có sẵn và tham gia vào một phòng bất kỳ.
+*   **Mời tham gia phòng chơi**: chủ phòng có thể mời người chơi khác (đang trực tuyến và không tham gia trận) tham gia phòng chơi.
 *   **Sảnh chờ (Lobby):** Sau khi tham gia, người chơi sẽ vào một sảnh chờ, nơi họ có thể thấy danh sách người chơi trong phòng.
 
 **2.3. Trạng thái & Lời mời**
