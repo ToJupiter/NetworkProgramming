@@ -16,10 +16,12 @@ add_library(sqlite_modern_cpp INTERFACE)
 target_include_directories(sqlite_modern_cpp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/sqlite_modern_cpp/hdr)
 target_link_libraries(sqlite_modern_cpp INTERFACE sqlite3)
 
+# bcrypt library
+add_subdirectory(thirdparty/libbcrypt)
 
 add_executable(server ${SERVER_SOURCES})
-target_link_libraries(server PRIVATE sqlite3 sqlite_modern_cpp)
-target_include_directories(server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/sqlite3)
+target_link_libraries(server PRIVATE sqlite3 sqlite_modern_cpp bcrypt)
+target_include_directories(server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/sqlite3 ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/bcrypt)
 
 
 

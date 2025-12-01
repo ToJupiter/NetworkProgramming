@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sqlite_modern_cpp.h>
+#include "bcrypt.h"
 
 int main(int argc, char **argv){
     try {
@@ -13,9 +14,9 @@ int main(int argc, char **argv){
             "hashed_password TEXT NOT NULL,"
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
             ");";
-
-        std::string name = "alice.johnson@email.com";
-        std::string display_name = "AliceJ";
+        
+        std::string name = "alice.dakinson@email.com";
+        std::string display_name = "AliceDakinson";
         std::string hashed_password = "$2b$12$Xq.uAdsQ2EjdaBeMZuZDjumTw8eeELY0fm4seJfdhA91mX.mV.NeG";
         
 
@@ -34,6 +35,17 @@ int main(int argc, char **argv){
         std::cerr << "SQLite error: " << e.what() << std::endl;
         return 1;
     }
+
+
+    // bcrypt testing
+    char salt[BCRYPT_HASHSIZE];
+    char hash[BCRYPT_HASHSIZE];
+    const char *password = "MyPassword123";
+
+    bcrypt_gensalt(12, salt);
+    printf("Generated salt: %s\n", salt);
+    bcrypt_hashpw(password, salt, hash);
+    printf("Generated hash: %s\n", hash);
 
     return 0;
 }
