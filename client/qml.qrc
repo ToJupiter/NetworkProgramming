@@ -1,0 +1,27 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>qml/main.qml</file>
+        <file>qml/MenuStart.qml</file>
+        <file>qml/LoginPage.qml</file>
+        <file>qml/SignUpPage.qml</file>
+        <file>qml/MenuMain.qml</file>
+        <file>qml/GameScreen.qml</file>
+        <file>qml/BackGround.qml</file>
+        <file>qml/ButtonAnimation.qml</file>
+        <file>qml/CButton.qml</file>
+        <file>qml/SelectButton.qml</file>
+        <file>qml/SelectButtonPage.qml</file>
+        <file>qml/CountDown.qml</file>
+        <file>qml/PausePopup.qml</file>
+        <file>qml/PrizePopup.qml</file>
+        <file>qml/ResultPopup.qml</file>
+        <file>qml/VotePopup.qml</file>
+        <file>qml/CallPhonePopup.qml</file>
+        <file>qml/FoundOpponentPopup.qml</file>
+        <file>qml/ChangePasswordPage.qml</file>
+        <file>qml/Logo.qml</file>
+    </qresource>
+</RCC>
+
+
