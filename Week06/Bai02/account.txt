@@ -1,0 +1,4 @@
+alice mypassword 1
+bob secret123 0
+charlie passw0rd 1
+haiph hai123 1
