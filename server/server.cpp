@@ -47,5 +47,8 @@ int main(int argc, char **argv){
     bcrypt_hashpw(password, salt, hash);
     printf("Generated hash: %s\n", hash);
 
+    // password checking: -1 if failed, 0 if match, >0 if does not match
+    int password_match = bcrypt_checkpw(password, hash);
+
     return 0;
 }

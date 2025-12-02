@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS game_log (
     question_id INTEGER NOT NULL,
     selected_option INTEGER NOT NULL,
     is_correct BOOLEAN NOT NULL,
-    response_time_ms INTEGER NOT NULL, -- Time in milliseconds to answer
+    response_time_ms INTEGER NOT NULL,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(session_id) REFERENCES game_sessions(id),
     FOREIGN KEY(user_id) REFERENCES users(id),

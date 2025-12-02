@@ -175,9 +175,9 @@ struct PlayerRoundResult {
     int32_t score_change;
     uint32_t total_score;
     uint8_t correct_option;
-    uint32_t points_for_this_question; // Points specifically earned for this question.
-    bool was_eliminated; // For elimination mode.
-    bool answered_question; // True if player submitted an answer, false if timed out or no answer.
+    uint32_t points_for_this_question; 
+    bool was_eliminated; 
+    bool answered_question;
 };
 
 struct RoundResultNotification {

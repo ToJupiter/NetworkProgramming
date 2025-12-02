@@ -1,0 +1,141 @@
+#include "ClientSession.h"
+#include "Server.h"
+#include "../db/DatabaseManager.h"
+#include <unistd.h>
+#include <sys/socket.h>
+#include <cstring>
+#include <iostream>
+#include <arpa/inet.h>
+
+ClientSession::ClientSession(int fd, Server* server) 
+    : clientFd(fd), server(server), markedForDeletion(false) {
+    recvBuffer.reserve(4096);
+    sendBuffer.reserve(4096);
+}
+
+ClientSession::~ClientSession() {
+    close(clientFd);
+}
+
+void ClientSession::readData() {
+    uint8_t tempBuf[4096];
+    ssize_t bytes = read(clientFd, tempBuf, sizeof(tempBuf));
+
+    if (bytes > 0) {
+        recvBuffer.insert(recvBuffer.end(), tempBuf, tempBuf + bytes);
+        processBuffer();
+    } else if (bytes == 0 || (bytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK)) {
+        markedForDeletion = true;
+    }
+}
+
+void ClientSession::processBuffer() {
+    while (recvBuffer.size() >= sizeof(MessageHeader)) {
+        MessageHeader header;
+        std::memcpy(&header, recvBuffer.data(), sizeof(MessageHeader));
+
+        // Note: In a real scenario, use ntohl/ntohs if protocol mandates network byte order.
+        // Assuming strictly little-endian/host-order for this local simulation phase.
+        
+        if (recvBuffer.size() < sizeof(MessageHeader) + header.body_len) {
+            break; 
+        }
+
+        std::vector<uint8_t> body(
+            recvBuffer.begin() + sizeof(MessageHeader),
+            recvBuffer.begin() + sizeof(MessageHeader) + header.body_len
+        );
+
+        handleMessage(header, body);
+
+        recvBuffer.erase(
+            recvBuffer.begin(), 
+            recvBuffer.begin() + sizeof(MessageHeader) + header.body_len
+        );
+    }
+}
+
+void ClientSession::handleMessage(const MessageHeader& header, const std::vector<uint8_t>& body) {
+    switch (header.type) {
+        case MessageType::C2S_REGISTER_REQ: {
+            if (body.size() >= sizeof(RegisterRequest)) {
+                handleRegister(reinterpret_cast<const RegisterRequest*>(body.data()));
+            }
+            break;
+        }
+        case MessageType::C2S_LOGIN_REQ: {
+            if (body.size() >= sizeof(LoginRequest)) {
+                handleLogin(reinterpret_cast<const LoginRequest*>(body.data()));
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void ClientSession::handleRegister(const RegisterRequest* req) {
+    std::string email(req->email);
+    std::string display(req->display_name);
+    std::string pass(req->password);
+
+    StatusCode status = DatabaseManager::getInstance().registerUser(email, display, pass);
+    
+    StatusResponse rsp;
+    rsp.code = status;
+    sendResponse(MessageType::S2C_REGISTER_RSP, &rsp, sizeof(rsp));
+}
+
+void ClientSession::handleLogin(const LoginRequest* req) {
+    std::string email(req->email);
+    std::string pass(req->password);
+
+    auto user = DatabaseManager::getInstance().loginUser(email, pass);
+
+    if (user.has_value()) {
+        state.isAuthenticated = true;
+        state.userId = user->id;
+        state.displayName = user->display_name;
+
+        LoginResponse rsp;
+        rsp.code = StatusCode::SUCCESS;
+        rsp.user_id = user->id;
+        std::strncpy(rsp.display_name, user->display_name.c_str(), MAX_DISPLAY_NAME_LEN - 1);
+        sendResponse(MessageType::S2C_LOGIN_RSP, &rsp, sizeof(rsp));
+    } else {
+        LoginResponse rsp;
+        rsp.code = StatusCode::INVALID_CREDENTIALS;
+        rsp.user_id = 0;
+        std::memset(rsp.display_name, 0, MAX_DISPLAY_NAME_LEN);
+        sendResponse(MessageType::S2C_LOGIN_RSP, &rsp, sizeof(rsp));
+    }
+}
+
+void ClientSession::sendResponse(MessageType type, const void* data, uint32_t len) {
+    MessageHeader header;
+    header.type = type;
+    header.body_len = len;
+
+    const uint8_t* hdrPtr = reinterpret_cast<const uint8_t*>(&header);
+    sendBuffer.insert(sendBuffer.end(), hdrPtr, hdrPtr + sizeof(header));
+
+    if (len > 0 && data != nullptr) {
+        const uint8_t* bodyPtr = reinterpret_cast<const uint8_t*>(data);
+        sendBuffer.insert(sendBuffer.end(), bodyPtr, bodyPtr + len);
+    }
+}
+
+bool ClientSession::wantWrite() const {
+    return !sendBuffer.empty();
+}
+
+void ClientSession::writeData() {
+    if (sendBuffer.empty()) return;
+
+    ssize_t sent = write(clientFd, sendBuffer.data(), sendBuffer.size());
+    if (sent > 0) {
+        sendBuffer.erase(sendBuffer.begin(), sendBuffer.begin() + sent);
+    } else if (sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        markedForDeletion = true;
+    }
+}
