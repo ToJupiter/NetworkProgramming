@@ -14,8 +14,16 @@ ClientSession::ClientSession(int fd, Server* server)
 }
 
 ClientSession::~ClientSession() {
-    close(clientFd);
+    if (clientFd >= 0) close(clientFd);
 }
+
+void ClientSession::onDisconnect() {
+    if (state.currentRoomId != 0) {
+        server->getRoomManager()->leaveRoom(state.currentRoomId, state.userId);
+        state.currentRoomId = 0;
+    }
+}
+
 
 void ClientSession::readData() {
     uint8_t tempBuf[4096];
@@ -34,8 +42,8 @@ void ClientSession::processBuffer() {
         MessageHeader header;
         std::memcpy(&header, recvBuffer.data(), sizeof(MessageHeader));
 
-        // Note: In a real scenario, use ntohl/ntohs if protocol mandates network byte order.
-        // Assuming strictly little-endian/host-order for this local simulation phase.
+
+        header.body_len = ntohl(header.body_len);
         
         if (recvBuffer.size() < sizeof(MessageHeader) + header.body_len) {
             break; 
@@ -69,6 +77,24 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
             }
             break;
         }
+        case MessageType::C2S_CREATE_ROOM_REQ:
+            if (state.isAuthenticated && body.size() >= sizeof(CreateRoomRequest)) 
+                handleCreateRoom((const CreateRoomRequest*)body.data());
+            break;
+        case MessageType::C2S_LIST_ROOMS_REQ:
+            if (state.isAuthenticated) handleListRooms();
+            break;
+        case MessageType::C2S_JOIN_ROOM_REQ:
+            if (state.isAuthenticated && body.size() >= sizeof(JoinRoomRequest)) 
+                handleJoinRoom((const JoinRoomRequest*)body.data());
+            break;
+        case MessageType::C2S_LEAVE_ROOM_REQ:
+            if (state.isAuthenticated) handleLeaveRoom();
+            break;
+        case MessageType::C2S_READY_STATUS_REQ:
+            if (state.isAuthenticated && body.size() >= sizeof(ReadyStatusRequest))
+                handleReadyStatus((const ReadyStatusRequest*)body.data());
+            break;
         default:
             break;
     }
@@ -111,10 +137,91 @@ void ClientSession::handleLogin(const LoginRequest* req) {
     }
 }
 
+void ClientSession::handleCreateRoom(const CreateRoomRequest* req){
+    if (state.currentRoomId != 0){
+        CreateRoomResponse rsp;
+        rsp.code = StatusCode::FAILURE_GENERIC;
+        sendResponse(MessageType::S2C_CREATE_ROOM_RSP, &rsp, sizeof(rsp));
+        return;
+    }
+
+    Room* room = server->getRoomManager()->createRoom(state.userId, *req);
+    if (room) {
+        state.currentRoomId = room->getId();
+        room->addPlayer(this);
+        
+        CreateRoomResponse rsp;
+        rsp.code = StatusCode::SUCCESS;
+        rsp.room_info = room->getRoomInfo();
+        sendResponse(MessageType::S2C_CREATE_ROOM_RSP, &rsp, sizeof(rsp));
+    }
+}
+
+void ClientSession::handleListRooms() {
+    ListRoomsResponse rsp;
+    server->getRoomManager()->getAllRooms(rsp);
+    sendResponse(MessageType::S2C_LIST_ROOMS_RSP, &rsp, sizeof(rsp));
+}
+
+void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
+    if (state.currentRoomId != 0) {
+        JoinRoomResponse rsp;
+        rsp.code = StatusCode::FAILURE_GENERIC; 
+        sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
+        return;
+    }
+
+    Room* room = server->getRoomManager()->getRoom(req->room_id);
+    if (!room) {
+        JoinRoomResponse rsp;
+        rsp.code = StatusCode::ROOM_NOT_FOUND;
+        sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
+        return;
+    }
+
+    if (room->isFull()) {
+        JoinRoomResponse rsp;
+        rsp.code = StatusCode::ROOM_FULL;
+        sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
+        return;
+    }
+
+    if (room->addPlayer(this)) {
+        state.currentRoomId = room->getId();
+        JoinRoomResponse rsp;
+        rsp.code = StatusCode::SUCCESS;
+        rsp.room_info = room->getRoomInfo();
+        rsp.host_user_id = room->getHostId();
+        room->getPlayerList(rsp);
+        sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
+    } else {
+        JoinRoomResponse rsp;
+        rsp.code = StatusCode::GAME_IN_PROGRESS;
+        sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
+    }
+}
+
+void ClientSession::handleLeaveRoom() {
+    if (state.currentRoomId == 0) return;
+    
+    server->getRoomManager()->leaveRoom(state.currentRoomId, state.userId);
+    state.currentRoomId = 0;
+    
+}
+
+void ClientSession::handleReadyStatus(const ReadyStatusRequest* req) {
+    if (state.currentRoomId == 0) return;
+
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->setPlayerReady(state.userId, req->is_ready);
+    }
+}
+
 void ClientSession::sendResponse(MessageType type, const void* data, uint32_t len) {
     MessageHeader header;
     header.type = type;
-    header.body_len = len;
+    header.body_len = htonl(len);
 
     const uint8_t* hdrPtr = reinterpret_cast<const uint8_t*>(&header);
     sendBuffer.insert(sendBuffer.end(), hdrPtr, hdrPtr + sizeof(header));
@@ -138,4 +245,8 @@ void ClientSession::writeData() {
     } else if (sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
         markedForDeletion = true;
     }
+}
+
+void ClientSession::sendMsg(MessageType type, const void* data, uint32_t len) {
+    sendResponse(type, data, len);
 }

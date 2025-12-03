@@ -8,6 +8,8 @@
 #include <cstring>
 
 Server::Server(int port) {
+    roomManager = std::make_unique<RoomManager>();
+
     listenerFd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenerFd < 0) {
         perror("Socket creation failed");
@@ -55,6 +57,10 @@ Server::~Server() {
     close(epollFd);
 }
 
+RoomManager* Server::getRoomManager(){
+    return roomManager.get();
+}
+
 void Server::setNonBlocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
@@ -80,10 +86,10 @@ void Server::run() {
                     }
                     
                     if (it->second->isMarkedForDeletion()) {
+                        it->second->onDisconnect();
                         epoll_ctl(epollFd, EPOLL_CTL_DEL, fd, nullptr);
                         sessions.erase(it);
                     } else {
-                        // Update epoll flags based on write buffer status
                         struct epoll_event ev;
                         ev.events = EPOLLIN | EPOLLET;
                         if (it->second->wantWrite()) {
@@ -107,7 +113,6 @@ void Server::handleAccept() {
 
     setNonBlocking(clientFd);
     
-    // Create new session
     sessions[clientFd] = std::make_unique<ClientSession>(clientFd, this);
 
     struct epoll_event ev;
