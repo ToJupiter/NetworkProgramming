@@ -9,6 +9,8 @@ set(SERVER_SOURCES
     src/db/DatabaseManager.cpp
     src/network/Server.cpp
     src/network/ClientSession.cpp
+    src/game/Room.cpp
+    src/game/RoomManager.cpp
 )
 
 ### Third-party library handler ###

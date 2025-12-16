@@ -1,5 +1,6 @@
 #include "network/Server.h"
 #include "db/DatabaseManager.h"
+#include <sqlite_modern_cpp.h>
 #include <iostream>
 
 int main(int argc, char** argv) {
