@@ -11,6 +11,8 @@ set(SERVER_SOURCES
     src/network/ClientSession.cpp
     src/game/Room.cpp
     src/game/RoomManager.cpp
+    src/db/QuestionRepository.cpp
+    src/db/UserRepository.cpp
 )
 
 ### Third-party library handler ###

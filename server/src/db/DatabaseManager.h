@@ -16,6 +16,7 @@ struct UserData {
 class DatabaseManager {
 public:
     static DatabaseManager& getInstance();
+    sqlite::database& getDb() { return *db; } 
     
     StatusCode registerUser(const std::string& email, const std::string& display_name, const std::string& password);
     std::optional<UserData> loginUser(const std::string& email, const std::string& password);
