@@ -375,13 +375,14 @@ QUESTION_DISPATCHING (Duration: 0ms - network latency)
   └─► Actions:
         - Record dispatch timestamp per player (map: user_id → sent_time_ms)
         - Send S2C_QUESTION_NOTIF to all participants
-        - Start answer window timer
+        - For this part, the timer should be put on client-side. The answer time should be recorded on the client and send to the server. Our SubmitAnswerRequest protocol already supports this.
       Transition: on(dispatch_complete) → ANSWER_WINDOW_OPEN
 
 ANSWER_WINDOW_OPEN (Duration: time_limit_sec)
   └─► Properties:
         - Accept C2S_SUBMIT_ANSWER_REQ
-        - Validate: timestamp ∈ [0, time_limit_ms + 500] (500ms grace for latency)
+        - Please note that TIMER_EXPIRE is the state of the client, which means the server sends the time for that question, the clock is in the client side, then the client sends back to the server how much time it costs for the user to answer that question. 
+        - Validate: timestamp ∈ [0, time_limit_ms + 500] (500ms grace for latency, meaning the server will wait 500ms within its window to wait for response from the client after the time limit of the server hits)
         - Store answers in pending_answers vector
       Transition: on(TIMER_EXPIRE) → ANSWER_WINDOW_CLOSED
                    or on(all_players_answered) → ANSWER_WINDOW_CLOSED
