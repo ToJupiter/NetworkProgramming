@@ -16,6 +16,7 @@ public:
     void removeRoom(uint32_t roomId);
     
     bool leaveRoom(uint32_t roomId, uint32_t userId);
+    void updateAllRooms();
 
 private:
     std::mutex managerMutex;

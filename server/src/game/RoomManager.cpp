@@ -53,3 +53,15 @@ bool RoomManager::leaveRoom(uint32_t roomId, uint32_t userId) {
     }
     return isEmpty;
 }
+
+void RoomManager::updateAllRooms() {
+    std::lock_guard<std::mutex> lock(managerMutex);
+
+    uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    for (auto it = activeRooms.begin(); it != activeRooms.end(); ) {
+        it->second->update(now);
+        ++it;
+    } 
+}

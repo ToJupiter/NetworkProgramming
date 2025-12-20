@@ -68,7 +68,7 @@ void Server::setNonBlocking(int fd) {
 
 void Server::run() {
     while (true) {
-        int nfds = epoll_wait(epollFd, events, MAX_EVENTS, -1);
+        int nfds = epoll_wait(epollFd, events, MAX_EVENTS, 50);
 
         for (int i = 0; i < nfds; ++i) {
             int fd = events[i].data.fd;
@@ -101,6 +101,7 @@ void Server::run() {
                 }
             }
         }
+        roomManager->updateAllRooms();
     }
 }
 

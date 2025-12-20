@@ -40,6 +40,7 @@ private:
     void handleJoinRoom(const JoinRoomRequest* req);
     void handleLeaveRoom();
     void handleReadyStatus(const ReadyStatusRequest* req);
+    void handleSubmitAnswer(const SubmitAnswerRequest* req);
 
     void sendResponse(MessageType type, const void* data, uint32_t len);
 

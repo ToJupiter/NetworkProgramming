@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include "../network/ClientSession.h"
 #include "Room.h"
+#include "../db/DatabaseManager.h"
 
 Room::Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions): roomId(id), hostUserId(hostId), roomName(std::move(name)), gameMode(mode), numQuestions(questions), maxPlayers(MAX_PLAYERS_PER_ROOM), state(RoomState::WAITING), stateStartTimeMs(0), currentQuestionIndex(0) {}
 
@@ -194,5 +195,178 @@ void Room::nextRound() {
     }
 
     broadcast(MessageType::S2C_QUESTION_NOTIF, &notif, sizeof(notif));
+}
+
+void Room::handleSubmitAnswer(uint32_t userId, const SubmitAnswerRequest& req) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+
+    if (state != RoomState::IN_GAME_QUESTION) return;
+    auto it = participants.find(userId);
+    if (it == participants.end()) return;
+    if (it->second.isEliminated || it->second.hasAnswered) return;
+
+    uint64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    uint64_t measuredLatency = static_cast<uint32_t>(nowMs - stateStartTimeMs);
+    uint32_t clientReportedTime = req.response_time_ms;
+    uint64_t maxAllowed = static_cast<uint32_t>(QUESTION_TIME_LIMIT_MS + 500);
+
+    it->second.hasAnswered = true;
+    it->second.selectedOption = req.selected_option;
+    
+    if (clientReportedTime > maxAllowed || clientReportedTime < (measuredLatency > 200 ? measuredLatency - 200 : 0))
+        it->second.lastResponseTimeMs = measuredLatency;
+    else
+        it->second.lastResponseTimeMs = clientReportedTime;
+
+    pendingLogs.push_back({
+        userId,
+        questions[currentQuestionIndex].id,
+        req.selected_option,
+        (req.selected_option == questions[currentQuestionIndex].correct_option),
+        it->second.lastResponseTimeMs
+    });
+}
+
+void Room::endRound() {
+    calculateScores();
+    state = RoomState::IN_GAME_RESULT;
+    stateStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+
+    RoundResultNotification notif;
+    notif.correct_option = questions[currentQuestionIndex].correct_option;
+    notif.result_count = 0;
+
+    for (const auto &p: participants) {
+        PlayerRoundResult& res = notif.results[notif.result_count++];
+        res.user_id = p.first;
+        res.score_change = p.second.lastScoreChange;
+        res.total_score = p.second.score;
+        res.correct_option = questions[currentQuestionIndex].correct_option;
+        res.points_for_this_question = (p.second.lastScoreChange > 0) ? p.second.lastScoreChange : 0;
+        res.was_eliminated = p.second.isEliminated;
+        res.answered_question = p.second.hasAnswered;
+    }
+
+    broadcast(MessageType::S2C_ROUND_RESULT_NOTIF, &notif, sizeof(notif));
+
+    if (gameMode == GameMode::ELIMINATION) {
+        for (const auto &p : participants) {
+            if (p.second.isEliminated && p.second.lastScoreChange == -1) {
+                PlayerEliminatedNotification elimNotif;
+                elimNotif.user_id = p.first;
+                elimNotif.session_id = 0;
+                broadcast(MessageType::S2C_PLAYER_ELIMINATED_NOTIF, &notif, sizeof(notif));
+            }
+        }
+    }
+}
+
+void Room::calculateScores() {
+    uint8_t correctOpt = questions[currentQuestionIndex].correct_option;
+
+    int activeCount = 0;
+    for (auto &p: participants) if (!p.second.isEliminated) activeCount++;
+
+    for (auto& pair: participants) {
+        auto& p = pair.second;
+        if (!p.isEliminated) continue;
+
+        bool correct = p.hasAnswered && (p.selectedOption == correctOpt);
+
+        if (gameMode == GameMode::SCORING) {
+            if (correct) {
+                double ratio = (double)p.lastResponseTimeMs / QUESTION_TIME_LIMIT_MS;
+                if (ratio > 1.0) ratio = 1.0;
+                int points = 1000 - (int)(500 * ratio);
+                p.score += points;
+                p.lastScoreChange = points;
+            }
+            else p.lastScoreChange = 0;
+        }
+
+        else if (gameMode == GameMode::ELIMINATION) {
+            if (!correct) {
+                p.isEliminated = true;
+                p.lastScoreChange = -1;
+            } else {
+                p.score += 100;
+                p.lastScoreChange = 100;
+            }
+        }
+    }
+}
+
+void Room::finishGame() {
+    state = RoomState::FINISHED;
+
+    std::vector<PlayerGameData*> sortedPlayers;
+    for (auto& p: participants) sortedPlayers.push_back(&p.second);
+
+    std::sort(sortedPlayers.begin(), sortedPlayers.end(), [](PlayerGameData* a, PlayerGameData* b) {
+        if (a->isEliminated != b->isEliminated) return !a->isEliminated;
+        return a->score > b->score;
+    });
+
+    GameOverNotification notif;
+    notif.result_count = 0;
+
+    for (size_t i = 0; i < sortedPlayers.size(); ++i) {
+        PlayerFinalResult& res = notif.results[notif.result_count++];
+        res.user_id = sortedPlayers[i]->session->getUserId();
+        std::strncpy(res.display_name, sortedPlayers[i]->session->getDisplayName().c_str(), MAX_DISPLAY_NAME_LEN - 1);
+        res.final_rank = static_cast<uint32_t>(i + 1);
+        res.final_score = sortedPlayers[i]->score;
+    }
+
+    broadcast(MessageType::S2C_GAME_OVER_NOTIF, &notif, sizeof(notif));
+
+    persistResults(sortedPlayers);
+}
+
+void Room::persistResults(const std::vector<PlayerGameData*>& sortedPlayers) {
+    try {
+        auto& db = DatabaseManager::getInstance().getDb();
+        
+        db << "BEGIN TRANSACTION;";
+
+        std::string modeStr = (gameMode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
+        db << "INSERT INTO game_sessions (game_mode, ended_at) VALUES (?, CURRENT_TIMESTAMP);" << modeStr;
+        
+        uint32_t sessionId = 0;
+        db << "SELECT last_insert_rowid();" >> sessionId;
+
+        for (size_t i = 0; i < sortedPlayers.size(); ++i) {
+            db << "INSERT INTO session_participants (user_id, session_id, score, rank) VALUES (?, ?, ?, ?);"
+               << sortedPlayers[i]->session->getUserId()
+               << sessionId
+               << sortedPlayers[i]->score
+               << static_cast<uint32_t>(i + 1);
+        }
+
+        for (const auto& log : pendingLogs) {
+            db << "INSERT INTO game_log (session_id, user_id, question_id, selected_option, is_correct, response_time_ms) VALUES (?, ?, ?, ?, ?, ?);"
+               << sessionId
+               << log.user_id
+               << log.question_id
+               << static_cast<int>(log.selected_option)
+               << (log.is_correct ? 1 : 0)
+               << log.response_time_ms;
+        }
+
+        db << "COMMIT;";
+    } catch (const std::exception& e) {
+        DatabaseManager::getInstance().getDb() << "ROLLBACK;";
+        std::cerr << "Persistence Error: " << e.what() << std::endl;
+    }
+}
+
+bool Room::allActivePlayersAnswered() {
+    for (const auto &p : participants) {
+        if (!p.second.isEliminated && !p.second.hasAnswered) return false;
+    }
+    return true;
 }
 

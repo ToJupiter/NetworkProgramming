@@ -95,6 +95,10 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
             if (state.isAuthenticated && body.size() >= sizeof(ReadyStatusRequest))
                 handleReadyStatus((const ReadyStatusRequest*)body.data());
             break;
+        case MessageType::C2S_SUBMIT_ANSWER_REQ:
+            if (state.isAuthenticated && body.size() >= sizeof(SubmitAnswerRequest))
+                handleSubmitAnswer(reinterpret_cast<const SubmitAnswerRequest*>(body.data()));
+            break;
         default:
             break;
     }
@@ -249,4 +253,13 @@ void ClientSession::writeData() {
 
 void ClientSession::sendMsg(MessageType type, const void* data, uint32_t len) {
     sendResponse(type, data, len);
+}
+
+void ClientSession::handleSubmitAnswer(const SubmitAnswerRequest* req) {
+    if (state.currentRoomId == 0) return;
+
+    Room *room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleSubmitAnswer(state.userId, *req);
+    }
 }

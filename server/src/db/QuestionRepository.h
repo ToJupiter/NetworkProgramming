@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
-#include "../../common/protocol.h"
+#include "protocol.h"
 
 struct Question {
     uint32_t id;

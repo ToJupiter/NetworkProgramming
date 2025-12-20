@@ -83,4 +83,16 @@ private:
     //     bool isReady;
     // };
     // std::map<uint32_t, PlayerEntry> participants;
+
+    struct LogEntry {
+        uint32_t user_id;
+        uint32_t question_id;
+        uint8_t selected_option;
+        bool is_correct;
+        uint32_t response_time_ms;
+    };
+    std::vector<LogEntry> pendingLogs;
+    uint32_t dbSessionId = 0;
+
+    void persistResults(const std::vector<PlayerGameData*>& sortedPlayers);
 };
