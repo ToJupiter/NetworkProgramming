@@ -43,6 +43,12 @@ enum class MessageType : uint16_t {
     C2S_GET_STATS_REQ,
     S2C_GET_STATS_RSP,
 
+    C2S_PAUSE_GAME_REQ,
+    S2C_GAME_PAUSED_NOTIF,
+    C2S_RESUME_GAME_REQ,
+    S2C_GAME_RESUMED_NOTIF,
+    S2C_GAME_TERMINATED_NOTIF,
+
     S2C_ERROR_RSP
 };
 
@@ -60,6 +66,14 @@ enum class StatusCode : uint8_t {
 enum class GameMode : uint8_t {
     ELIMINATION,
     SCORING
+};
+
+
+enum class TerminationReason : uint8_t {
+    HOST_LEFT,
+    NOT_ENOUGH_PLAYERS,
+    SERVER_SHUTDOWN,
+    UNKNOWN
 };
 
 #pragma pack(push, 1)
@@ -209,8 +223,27 @@ struct UserStatsResponse {
     uint32_t total_correct_answers;
     uint32_t total_incorrect_answers;
     double average_score;
+    uint32_t ranked_points;
+};
 
-    // We will need changes here based on how we calculates our score, implement later
+struct PauseGameRequest {
+    // Empty body
+};
+
+struct GamePausedNotification {
+    // Empty body
+};
+
+struct ResumeGameRequest {
+    // Empty body
+};
+
+struct GameResumedNotification {
+    // Empty body
+};
+
+struct GameTerminatedNotification {
+    TerminationReason reason;
 };
 
 struct ErrorResponse {

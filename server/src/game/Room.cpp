@@ -2,8 +2,9 @@
 #include "../network/ClientSession.h"
 #include "Room.h"
 #include "../db/DatabaseManager.h"
+#include "../db/UserRepository.h"
 
-Room::Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions): roomId(id), hostUserId(hostId), roomName(std::move(name)), gameMode(mode), numQuestions(questions), maxPlayers(MAX_PLAYERS_PER_ROOM), state(RoomState::WAITING), stateStartTimeMs(0), currentQuestionIndex(0) {}
+Room::Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions): roomId(id), hostUserId(hostId), roomName(std::move(name)), gameMode(mode), numQuestions(questions), maxPlayers(MAX_PLAYERS_PER_ROOM), state(RoomState::WAITING), stateStartTimeMs(0), currentQuestionIndex(0), previousState(RoomState::WAITING), pauseStartTimeMs(0), totalPauseDurationMs(0) {}
 
 uint32_t Room::getId() const {return roomId;}
 uint32_t Room::getHostId() const {return hostUserId;}
@@ -56,14 +57,23 @@ void Room::removePlayer(uint32_t userId) {
     }
 
     if (userId == hostUserId) {
-        hostUserId = participants.begin()->first;
+        if (state == RoomState::WAITING){
+            hostUserId = participants.begin()->first;
+            PlayerLeftNotification notif;
+            notif.user_id = userId;
+            notif.new_host_user_id = hostUserId;
+            broadcast(MessageType::S2C_PLAYER_LEFT_NOTIF, &notif, sizeof(notif));
+        } else {
+            terminateGame(TerminationReason::HOST_LEFT);
+            return;
+        }
+    } else {
+        PlayerLeftNotification notif;
+        notif.user_id = userId;
+        notif.new_host_user_id = hostUserId;
+        broadcast(MessageType::S2C_PLAYER_LEFT_NOTIF, &notif, sizeof(notif));
     }
 
-    PlayerLeftNotification notif;
-    notif.user_id = userId;
-    notif.new_host_user_id = hostUserId;
-    
-    broadcast(MessageType::S2C_PLAYER_LEFT_NOTIF, &notif, sizeof(notif));
 }
 
 bool Room::setPlayerReady(uint32_t userId, bool ready) {
@@ -133,6 +143,7 @@ void Room::startGame() {
     state = RoomState::STARTING;
     stateStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
+    totalPauseDurationMs = 0;
     
     QuestionRepository repo;
     questions = repo.getRandomQuestions(numQuestions);
@@ -151,6 +162,8 @@ void Room::startGame() {
 
 void Room::update(uint64_t nowMs) {
     std::lock_guard<std::mutex> lock(roomMutex);
+
+    if (state == RoomState::PAUSED || state == RoomState::WAITING || state == RoomState::FINISHED) return;
 
     if (state == RoomState::STARTING) {
         if (nowMs >= stateStartTimeMs + START_DELAY_MS) {
@@ -208,7 +221,7 @@ void Room::handleSubmitAnswer(uint32_t userId, const SubmitAnswerRequest& req) {
     uint64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
     
-    uint64_t measuredLatency = static_cast<uint32_t>(nowMs - stateStartTimeMs);
+    uint64_t measuredLatency = static_cast<uint64_t>(nowMs - stateStartTimeMs);
     uint32_t clientReportedTime = req.response_time_ms;
     uint64_t maxAllowed = static_cast<uint32_t>(QUESTION_TIME_LIMIT_MS + 500);
 
@@ -216,7 +229,7 @@ void Room::handleSubmitAnswer(uint32_t userId, const SubmitAnswerRequest& req) {
     it->second.selectedOption = req.selected_option;
     
     if (clientReportedTime > maxAllowed || clientReportedTime < (measuredLatency > 200 ? measuredLatency - 200 : 0))
-        it->second.lastResponseTimeMs = measuredLatency;
+        it->second.lastResponseTimeMs = static_cast<uint32_t>(measuredLatency);
     else
         it->second.lastResponseTimeMs = clientReportedTime;
 
@@ -258,7 +271,7 @@ void Room::endRound() {
                 PlayerEliminatedNotification elimNotif;
                 elimNotif.user_id = p.first;
                 elimNotif.session_id = 0;
-                broadcast(MessageType::S2C_PLAYER_ELIMINATED_NOTIF, &notif, sizeof(notif));
+                broadcast(MessageType::S2C_PLAYER_ELIMINATED_NOTIF, &elimNotif, sizeof(elimNotif));
             }
         }
     }
@@ -266,9 +279,6 @@ void Room::endRound() {
 
 void Room::calculateScores() {
     uint8_t correctOpt = questions[currentQuestionIndex].correct_option;
-
-    int activeCount = 0;
-    for (auto &p: participants) if (!p.second.isEliminated) activeCount++;
 
     for (auto& pair: participants) {
         auto& p = pair.second;
@@ -313,27 +323,33 @@ void Room::finishGame() {
     GameOverNotification notif;
     notif.result_count = 0;
 
+    std::vector<UserRepository::RankUpdateInfo> eloUpdates;
+
     for (size_t i = 0; i < sortedPlayers.size(); ++i) {
         PlayerFinalResult& res = notif.results[notif.result_count++];
         res.user_id = sortedPlayers[i]->session->getUserId();
         std::strncpy(res.display_name, sortedPlayers[i]->session->getDisplayName().c_str(), MAX_DISPLAY_NAME_LEN - 1);
         res.final_rank = static_cast<uint32_t>(i + 1);
         res.final_score = sortedPlayers[i]->score;
+
+        eloUpdates.push_back({res.user_id, res.final_rank, res.final_score});
     }
 
     broadcast(MessageType::S2C_GAME_OVER_NOTIF, &notif, sizeof(notif));
 
-    persistResults(sortedPlayers);
+    persistResults(sortedPlayers, TerminationReason::UNKNOWN);
+    UserRepository::updateUserRanks(eloUpdates);
 }
 
-void Room::persistResults(const std::vector<PlayerGameData*>& sortedPlayers) {
+void Room::persistResults(const std::vector<PlayerGameData*>& sortedPlayers, TerminationReason reason) {
     try {
         auto& db = DatabaseManager::getInstance().getDb();
         
         db << "BEGIN TRANSACTION;";
 
         std::string modeStr = (gameMode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
-        db << "INSERT INTO game_sessions (game_mode, ended_at) VALUES (?, CURRENT_TIMESTAMP);" << modeStr;
+        db << "INSERT INTO game_sessions (game_mode, ended_at, total_pause_duration_ms) VALUES (?, CURRENT_TIMESTAMP, ?);" 
+           << modeStr << static_cast<long long>(totalPauseDurationMs);
         
         uint32_t sessionId = 0;
         db << "SELECT last_insert_rowid();" >> sessionId;
@@ -370,3 +386,51 @@ bool Room::allActivePlayersAnswered() {
     return true;
 }
 
+void Room::handlePauseGame(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    if (userId != hostUserId) return;
+    if (state != RoomState::IN_GAME_QUESTION && state != RoomState::IN_GAME_RESULT) return;
+
+    previousState = state;
+    state = RoomState::PAUSED;
+    pauseStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    GamePausedNotification notif;
+    broadcast(MessageType::S2C_GAME_PAUSED_NOTIF, &notif, sizeof(notif));
+}
+
+void Room::handleResumeGame(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    if (userId != hostUserId || state != RoomState::PAUSED) return;
+
+    uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    uint64_t duration = now - pauseStartTimeMs;
+    totalPauseDurationMs += duration;
+
+    stateStartTimeMs += duration;
+
+    state = previousState;
+
+    GameResumedNotification notif;
+    broadcast(MessageType::S2C_GAME_RESUMED_NOTIF, &notif, sizeof(notif));
+}
+
+void Room::terminateGame(TerminationReason reason) {
+    state = RoomState::FINISHED;
+
+    GameTerminatedNotification notif;
+    notif.reason = reason;
+    broadcast(MessageType::S2C_GAME_TERMINATED_NOTIF, &notif, sizeof(notif));
+
+    std::vector<PlayerGameData*> sortedPlayers;
+    for (auto &p: participants) sortedPlayers.push_back(&p.second);
+    std::sort(sortedPlayers.begin(), sortedPlayers.end(), [](PlayerGameData* a , PlayerGameData* b){
+        if (a->isEliminated != b->isEliminated) return !a->isEliminated;
+        return a->score > b->score;
+    });
+
+    persistResults(sortedPlayers, reason);
+}

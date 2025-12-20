@@ -1,6 +1,7 @@
 #include "ClientSession.h"
 #include "Server.h"
 #include "../db/DatabaseManager.h"
+#include "../db/UserRepository.h"
 #include <unistd.h>
 #include <sys/socket.h>
 #include <cstring>
@@ -98,6 +99,15 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
         case MessageType::C2S_SUBMIT_ANSWER_REQ:
             if (state.isAuthenticated && body.size() >= sizeof(SubmitAnswerRequest))
                 handleSubmitAnswer(reinterpret_cast<const SubmitAnswerRequest*>(body.data()));
+            break;
+        case MessageType::C2S_GET_STATS_REQ:
+            if (state.isAuthenticated) handleGetStats();
+            break;
+        case MessageType::C2S_PAUSE_GAME_REQ:
+            if (state.isAuthenticated) handlePauseGame();
+            break;
+        case MessageType::C2S_RESUME_GAME_REQ:
+            if (state.isAuthenticated) handleResumeGame();
             break;
         default:
             break;
@@ -261,5 +271,26 @@ void ClientSession::handleSubmitAnswer(const SubmitAnswerRequest* req) {
     Room *room = server->getRoomManager()->getRoom(state.currentRoomId);
     if (room) {
         room->handleSubmitAnswer(state.userId, *req);
+    }
+}
+
+void ClientSession::handleGetStats() {
+    UserStatsResponse stats = UserRepository::getUserStats(state.userId);
+    sendResponse(MessageType::S2C_GET_STATS_RSP, &stats, sizeof(stats));
+}
+
+void ClientSession::handlePauseGame() {
+    if (state.currentRoomId == 0) return;
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handlePauseGame(state.userId);
+    }
+}
+
+void ClientSession::handleResumeGame() {
+    if (state.currentRoomId == 0) return;
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleResumeGame(state.userId);
     }
 }

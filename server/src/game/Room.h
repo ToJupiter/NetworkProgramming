@@ -11,6 +11,7 @@ enum class RoomState {
     STARTING,
     IN_GAME_QUESTION,
     IN_GAME_RESULT,
+    PAUSED,
     FINISHED
 };
 
@@ -42,6 +43,9 @@ public:
 
     // Main gameplay (submit answer, auto-update state on server)
     void handleSubmitAnswer(uint32_t userId, const SubmitAnswerRequest& req);
+    void handlePauseGame(uint32_t userId);
+    void handleResumeGame(uint32_t userId);
+
     void update(uint64_t nowMs);
     
     RoomInfo getRoomInfo() const;
@@ -55,9 +59,11 @@ private:
     void nextRound();
     void endRound();
     void finishGame();
+    void terminateGame(TerminationReason reason);
 
     void calculateScores();
     bool allActivePlayersAnswered();
+    void persistResults(const std::vector<PlayerGameData*>& sortedPlayers, TerminationReason reason);
 
     mutable std::mutex roomMutex;
 
@@ -68,7 +74,11 @@ private:
     uint8_t numQuestions;
     uint8_t maxPlayers;
     RoomState state;
+    RoomState previousState;
     uint64_t stateStartTimeMs;
+
+    uint64_t pauseStartTimeMs;
+    uint64_t totalPauseDurationMs;
 
     std::map<uint32_t, PlayerGameData> participants;
     std::vector<Question> questions;
@@ -94,5 +104,4 @@ private:
     std::vector<LogEntry> pendingLogs;
     uint32_t dbSessionId = 0;
 
-    void persistResults(const std::vector<PlayerGameData*>& sortedPlayers);
 };

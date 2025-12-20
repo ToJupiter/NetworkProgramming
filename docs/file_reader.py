@@ -34,7 +34,7 @@ def code_to_markdown(folder_path, output_file="code_output.md", extensions=(".c"
 
 # === Sử dụng ===
 if __name__ == "__main__":
-    FOLDER_PATH = "/home/pypy/Projects/NetworkProgramming/server/src"  # Thay bằng đường dẫn thư mục của bạn
+    FOLDER_PATH = "/home/rocminfo/Documents/NetworkProgramming/server/src"  # Thay bằng đường dẫn thư mục của bạn
     OUTPUT_FILE = "current_server_code.md"
     
     if not os.path.exists(FOLDER_PATH):

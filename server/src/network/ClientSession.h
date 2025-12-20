@@ -41,6 +41,9 @@ private:
     void handleLeaveRoom();
     void handleReadyStatus(const ReadyStatusRequest* req);
     void handleSubmitAnswer(const SubmitAnswerRequest* req);
+    void handleGetStats();
+    void handlePauseGame();
+    void handleResumeGame();
 
     void sendResponse(MessageType type, const void* data, uint32_t len);
 
