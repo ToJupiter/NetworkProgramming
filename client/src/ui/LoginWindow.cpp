@@ -1,4 +1,5 @@
 #include "LoginWindow.h"
+#include "LobbyWindow.h"
 #include "ui_LoginWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
@@ -8,6 +9,7 @@
 LoginWindow::LoginWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::LoginWindow)
+    , lobbyWindow(nullptr)
 {
     ui->setupUi(this);
     
@@ -180,13 +182,21 @@ void LoginWindow::onLoginResponse(StatusCode code, uint32_t userId, const QStrin
     
     if (code == StatusCode::SUCCESS) {
         // Store session state
-        SessionState session;
-        session.setAuthenticated(true);
-        session.setUserId(userId);
-        session.setDisplayName(displayName);
-        session.setEmail(ui->txtLoginEmail->text().trimmed());
+        SessionState::instance()->setAuthenticated(true);
+        SessionState::instance()->setUserId(userId);
+        SessionState::instance()->setDisplayName(displayName);
+        SessionState::instance()->setEmail(ui->txtLoginEmail->text().trimmed());
         
         clearError();
+        
+        // Hide LoginWindow and show LobbyWindow
+        this->hide();
+        
+        // Create and show LobbyWindow
+        if (!lobbyWindow) {
+            lobbyWindow = new LobbyWindow();
+        }
+        lobbyWindow->show();
     } else if (code == StatusCode::INVALID_CREDENTIALS) {
         showError("Invalid email or password!");
     } else {
