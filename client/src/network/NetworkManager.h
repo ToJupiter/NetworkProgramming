@@ -40,20 +40,19 @@ signals:
     void loginResponse(StatusCode code, uint32_t userId, const QString& displayName);
     void createRoomResponse(StatusCode code, const RoomInfo& roomInfo);
     void listRoomsResponse(uint16_t roomCount, const QVector<RoomInfo>& rooms);
-    void joinRoomResponse(StatusCode code, uint32_t roomId, const QString& roomName, 
-                         uint8_t playerCount, const QVector<PlayerBasicInfo>& players);
+    void joinRoomResponse(StatusCode code, const RoomInfo& roomInfo, 
+                         uint8_t playerCount, const QVector<PlayerInfo>& players, uint32_t hostUserId);
     
     // Notifications
-    void playerJoinedNotif(uint32_t userId, const QString& displayName);
+    void playerJoinedNotif(const PlayerInfo& player);
     void playerLeftNotif(uint32_t userId);
     void readyStatusNotif(uint32_t userId, bool ready);
     void gameStartNotif();
     void questionNotif(uint32_t questionId, const QString& content, 
                       const QStringList& options, uint32_t timeLimitSec);
-    void roundResultNotif(uint8_t correctOption, int32_t myScoreChange, 
-                         uint8_t playerCount, const QVector<PlayerRoundResult>& results);
+    void roundResultNotif(uint8_t correctOption, uint8_t playerCount, const QVector<PlayerRoundResult>& results);
     void playerEliminatedNotif(uint32_t userId);
-    void gameOverNotif(uint8_t rankingCount, const QVector<FinalRanking>& rankings);
+    void gameOverNotif(uint8_t rankingCount, const QVector<PlayerFinalResult>& rankings);
     void gamePausedNotif();
     void gameResumedNotif();
     void gameTerminatedNotif(TerminationReason reason);

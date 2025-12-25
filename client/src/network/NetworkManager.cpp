@@ -210,30 +210,28 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         
         case MessageType::S2C_JOIN_ROOM_RSP: {
             auto resp = ProtocolHelper::unpackStruct<JoinRoomResponse>(body);
-            QString roomName = ProtocolHelper::fromFixedArray(resp.room_name, MAX_ROOM_NAME_LEN);
-            QVector<PlayerBasicInfo> players;
+            QVector<PlayerInfo> players;
             for (int i = 0; i < resp.player_count; ++i) {
                 players.append(resp.players[i]);
             }
-            emit joinRoomResponse(resp.code, resp.room_id, roomName, resp.player_count, players);
+            emit joinRoomResponse(resp.code, resp.room_info, resp.player_count, players, resp.host_user_id);
             break;
         }
         
         case MessageType::S2C_PLAYER_JOINED_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<PlayerJoinedNotif>(body);
-            QString displayName = ProtocolHelper::fromFixedArray(notif.display_name, MAX_DISPLAY_NAME_LEN);
-            emit playerJoinedNotif(notif.user_id, displayName);
+            auto notif = ProtocolHelper::unpackStruct<PlayerInfo>(body);
+            emit playerJoinedNotif(notif);
             break;
         }
         
         case MessageType::S2C_PLAYER_LEFT_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<PlayerLeftNotif>(body);
+            auto notif = ProtocolHelper::unpackStruct<PlayerLeftNotification>(body);
             emit playerLeftNotif(notif.user_id);
             break;
         }
         
         case MessageType::S2C_READY_STATUS_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<ReadyStatusNotif>(body);
+            auto notif = ProtocolHelper::unpackStruct<ReadyStatusNotification>(body);
             emit readyStatusNotif(notif.user_id, notif.is_ready != 0);
             break;
         }
@@ -244,7 +242,7 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         }
         
         case MessageType::S2C_QUESTION_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<QuestionNotif>(body);
+            auto notif = ProtocolHelper::unpackStruct<QuestionNotification>(body);
             QString content = ProtocolHelper::fromFixedArray(notif.content, MAX_QUESTION_CONTENT_LEN);
             QStringList options;
             for (int i = 0; i < 4; ++i) {
@@ -255,28 +253,28 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         }
         
         case MessageType::S2C_ROUND_RESULT_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<RoundResultNotif>(body);
+            auto notif = ProtocolHelper::unpackStruct<RoundResultNotification>(body);
             QVector<PlayerRoundResult> results;
-            for (int i = 0; i < notif.player_count; ++i) {
-                results.append(notif.player_results[i]);
+            for (int i = 0; i < notif.result_count; ++i) {
+                results.append(notif.results[i]);
             }
-            emit roundResultNotif(notif.correct_option, notif.my_score_change, notif.player_count, results);
+            emit roundResultNotif(notif.correct_option, notif.result_count, results);
             break;
         }
         
         case MessageType::S2C_PLAYER_ELIMINATED_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<PlayerEliminatedNotif>(body);
+            auto notif = ProtocolHelper::unpackStruct<PlayerEliminatedNotification>(body);
             emit playerEliminatedNotif(notif.user_id);
             break;
         }
         
         case MessageType::S2C_GAME_OVER_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<GameOverNotif>(body);
-            QVector<FinalRanking> rankings;
-            for (int i = 0; i < notif.ranking_count; ++i) {
-                rankings.append(notif.final_rankings[i]);
+            auto notif = ProtocolHelper::unpackStruct<GameOverNotification>(body);
+            QVector<PlayerFinalResult> rankings;
+            for (int i = 0; i < notif.result_count; ++i) {
+                rankings.append(notif.results[i]);
             }
-            emit gameOverNotif(notif.ranking_count, rankings);
+            emit gameOverNotif(notif.result_count, rankings);
             break;
         }
         
@@ -291,7 +289,7 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         }
         
         case MessageType::S2C_GAME_TERMINATED_NOTIF: {
-            auto notif = ProtocolHelper::unpackStruct<GameTerminatedNotif>(body);
+            auto notif = ProtocolHelper::unpackStruct<GameTerminatedNotification>(body);
             emit gameTerminatedNotif(notif.reason);
             break;
         }

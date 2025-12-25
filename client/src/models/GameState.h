@@ -6,14 +6,15 @@
 #include <cstdint>
 #include "protocol.h"
 
-struct PlayerInfo {
-    uint32_t userId;
-    QString displayName;
-    bool isReady;
+// Local client-side player state (distinct from protocol::PlayerInfo)
+struct ClientPlayer {
+    uint32_t user_id;
+    QString display_name;
+    bool is_ready;
     uint32_t score;
-    bool isEliminated;
+    bool is_eliminated;
     
-    PlayerInfo() : userId(0), isReady(false), score(0), isEliminated(false) {}
+    ClientPlayer() : user_id(0), is_ready(false), score(0), is_eliminated(false) {}
 };
 
 struct QuestionData {
@@ -41,12 +42,12 @@ public:
     
     // Players
     void clearPlayers();
-    void addPlayer(const PlayerInfo& player);
+    void addPlayer(const ClientPlayer& player);
     void removePlayer(uint32_t userId);
     void updatePlayerReady(uint32_t userId, bool ready);
     void updatePlayerScore(uint32_t userId, uint32_t score, bool eliminated);
-    QVector<PlayerInfo> getPlayers() const { return m_players; }
-    PlayerInfo* findPlayer(uint32_t userId);
+    QVector<ClientPlayer> getPlayers() const { return m_players; }
+    ClientPlayer* findPlayer(uint32_t userId);
     
     // Current question
     void setCurrentQuestion(const QuestionData& question);
@@ -76,7 +77,7 @@ private:
     GameMode m_gameMode;
     uint8_t m_numQuestions;
     
-    QVector<PlayerInfo> m_players;
+    QVector<ClientPlayer> m_players;
     QuestionData m_currentQuestion;
     uint8_t m_currentQuestionIndex;
     

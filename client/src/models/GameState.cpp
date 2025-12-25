@@ -23,14 +23,14 @@ void GameState::clearPlayers() {
     emit playerListChanged();
 }
 
-void GameState::addPlayer(const PlayerInfo& player) {
+void GameState::addPlayer(const ClientPlayer& player) {
     m_players.append(player);
     emit playerListChanged();
 }
 
 void GameState::removePlayer(uint32_t userId) {
     for (int i = 0; i < m_players.size(); ++i) {
-        if (m_players[i].userId == userId) {
+        if (m_players[i].user_id == userId) {
             m_players.removeAt(i);
             emit playerListChanged();
             break;
@@ -39,25 +39,25 @@ void GameState::removePlayer(uint32_t userId) {
 }
 
 void GameState::updatePlayerReady(uint32_t userId, bool ready) {
-    PlayerInfo* player = findPlayer(userId);
+    ClientPlayer* player = findPlayer(userId);
     if (player) {
-        player->isReady = ready;
+        player->is_ready = ready;
         emit playerListChanged();
     }
 }
 
 void GameState::updatePlayerScore(uint32_t userId, uint32_t score, bool eliminated) {
-    PlayerInfo* player = findPlayer(userId);
+    ClientPlayer* player = findPlayer(userId);
     if (player) {
         player->score = score;
-        player->isEliminated = eliminated;
+        player->is_eliminated = eliminated;
         emit scoresUpdated();
     }
 }
 
-PlayerInfo* GameState::findPlayer(uint32_t userId) {
+ClientPlayer* GameState::findPlayer(uint32_t userId) {
     for (int i = 0; i < m_players.size(); ++i) {
-        if (m_players[i].userId == userId) {
+        if (m_players[i].user_id == userId) {
             return &m_players[i];
         }
     }

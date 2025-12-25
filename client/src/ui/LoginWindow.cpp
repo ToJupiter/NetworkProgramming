@@ -1,6 +1,5 @@
 #include "LoginWindow.h"
 #include "ui_LoginWindow.h"
-#include "LobbyWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 #include <QMessageBox>
@@ -9,7 +8,6 @@
 LoginWindow::LoginWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::LoginWindow)
-    , m_lobbyWindow(nullptr)
 {
     ui->setupUi(this);
     
@@ -31,9 +29,6 @@ LoginWindow::LoginWindow(QWidget *parent)
 
 LoginWindow::~LoginWindow() {
     delete ui;
-    if (m_lobbyWindow) {
-        delete m_lobbyWindow;
-    }
 }
 
 void LoginWindow::connectToServer() {
@@ -190,13 +185,6 @@ void LoginWindow::onLoginResponse(StatusCode code, uint32_t userId, const QStrin
         session.setUserId(userId);
         session.setDisplayName(displayName);
         session.setEmail(ui->txtLoginEmail->text().trimmed());
-        
-        // Open lobby window
-        if (!m_lobbyWindow) {
-            m_lobbyWindow = new LobbyWindow();
-        }
-        m_lobbyWindow->show();
-        this->hide();
         
         clearError();
     } else if (code == StatusCode::INVALID_CREDENTIALS) {
