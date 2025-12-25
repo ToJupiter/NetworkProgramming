@@ -1,10 +1,7 @@
 #include "ProtocolHelper.h"
 
-#ifdef _WIN32
-    #include <winsock2.h>
-#else
-    #include <arpa/inet.h>
-#endif
+// Linux/WSL: use POSIX networking byte order functions
+#include <arpa/inet.h>
 
 QByteArray ProtocolHelper::createMessage(MessageType type, const QByteArray& body) {
     MessageHeader header;
