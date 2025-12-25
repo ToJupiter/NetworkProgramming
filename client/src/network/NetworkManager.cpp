@@ -14,7 +14,7 @@ NetworkManager::NetworkManager()
     connect(m_socket, &QTcpSocket::connected, this, &NetworkManager::onConnected);
     connect(m_socket, &QTcpSocket::disconnected, this, &NetworkManager::onDisconnected);
     connect(m_socket, &QTcpSocket::readyRead, this, &NetworkManager::onReadyRead);
-    connect(m_socket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::error),
+    connect(m_socket, &QTcpSocket::errorOccurred,
             this, &NetworkManager::onSocketError);
 }
 
