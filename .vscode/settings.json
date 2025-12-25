@@ -87,5 +87,20 @@
         "valarray": "cpp",
         "variant": "cpp"
     },
-    "cmake.sourceDirectory": "/home/pypy/Projects/NetworkProgramming/server"
+    "cmake.sourceDirectory": "/mnt/c/Users/Admin/NetworkProgramming/client",
+    "C_Cpp.default.includePath": [
+        "/usr/include/x86_64-linux-gnu/qt5",
+        "/usr/include/x86_64-linux-gnu/qt5/QtCore",
+        "/usr/include/x86_64-linux-gnu/qt5/QtWidgets",
+        "/usr/include/x86_64-linux-gnu/qt5/QtNetwork",
+        "/usr/include/x86_64-linux-gnu",
+        "/mnt/c/Users/Admin/NetworkProgramming/common",
+        "/mnt/c/Users/Admin/NetworkProgramming/client/src"
+    ],
+    "C_Cpp.default.defines": [
+        "QT_CORE_LIB",
+        "QT_WIDGETS_LIB",
+        "QT_GUI_LIB",
+        "QT_NETWORK_LIB"
+    ]
 }
