@@ -7,6 +7,11 @@ SessionState::SessionState()
 {
 }
 
+SessionState& SessionState::instance() {
+    static SessionState inst;
+    return inst;
+}
+
 void SessionState::clear() {
     m_isAuthenticated = false;
     m_userId = 0;

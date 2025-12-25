@@ -32,7 +32,7 @@ private slots:
     void onCreateRoomResponse(StatusCode code, const RoomInfo& room_info);
     void onJoinRoomResponse(StatusCode code, const RoomInfo& room_info, 
                             uint8_t player_count, const QVector<PlayerInfo>& players, uint32_t host_user_id);
-    void onNetworkError(const QString &error);
+    void onConnectionError(const QString &error);
 
     // Timer slot
     void onRefreshTimer();
@@ -44,8 +44,8 @@ private:
     void stopAutoRefresh();
     void populateRoomTable(const QVector<RoomInfo> &rooms);
     void addJoinButtonToRow(int row);
-    QString formatGameMode(uint8_t mode) const;
-    QString formatRoomStatus(uint8_t status) const;
+    QString formatGameMode(GameMode mode) const;
+    QString formatRoomStatus(bool inGame) const;
 
     Ui::LobbyWindow *ui;
     NetworkManager *networkManager;

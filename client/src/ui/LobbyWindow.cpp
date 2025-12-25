@@ -10,7 +10,7 @@
 LobbyWindow::LobbyWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::LobbyWindow)
-    , networkManager(NetworkManager::instance())
+    , networkManager(&NetworkManager::instance())
     , refreshTimer(new QTimer(this))
     , selectedRoomIndex(-1)
 {
@@ -29,8 +29,8 @@ LobbyWindow::~LobbyWindow() {
 
 void LobbyWindow::setupUI() {
     // Update welcome label
-    SessionState *session = SessionState::instance();
-    ui->lblUserInfo->setText(QString("Welcome, %1").arg(session->getDisplayName()));
+    auto &session = SessionState::instance();
+    ui->lblUserInfo->setText(QString("Welcome, %1").arg(session.getDisplayName()));
 
     // Configure table widget
     ui->tblRooms->setColumnCount(6);
@@ -58,8 +58,8 @@ void LobbyWindow::setupConnections() {
             this, &LobbyWindow::onCreateRoomResponse);
     connect(networkManager, &NetworkManager::joinRoomResponse,
             this, &LobbyWindow::onJoinRoomResponse);
-    connect(networkManager, &NetworkManager::networkError,
-            this, &LobbyWindow::onNetworkError);
+        connect(networkManager, &NetworkManager::connectionError,
+            this, &LobbyWindow::onConnectionError);
 
     // Timer
     connect(refreshTimer, &QTimer::timeout, this, &LobbyWindow::onRefreshTimer);
@@ -101,7 +101,7 @@ void LobbyWindow::onLogoutClicked() {
         QMessageBox::Yes | QMessageBox::No);
 
     if (ret == QMessageBox::Yes) {
-        SessionState::instance()->clear();
+        SessionState::instance().clear();
         this->close();
         // LoginWindow will be shown by parent logic
     }
@@ -149,7 +149,7 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
                                      uint32_t host_user_id) {
     if (code == StatusCode::SUCCESS) { // Success
         // Store room info in session
-        SessionState::instance()->setCurrentRoomId(room_info.room_id);
+        SessionState::instance().setCurrentRoomId(room_info.room_id);
 
         QMessageBox::information(this, "Room Joined",
             QString("Joined room '%1'!\n"
@@ -168,7 +168,7 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
     }
 }
 
-void LobbyWindow::onNetworkError(const QString &error) {
+void LobbyWindow::onConnectionError(const QString &error) {
     ui->lblError->setText("Network error: " + error);
     ui->lblStatus->setText("Error loading rooms");
 }
@@ -210,7 +210,7 @@ void LobbyWindow::populateRoomTable(const QVector<RoomInfo> &rooms) {
         ui->tblRooms->setItem(row, 3, itemMode);
 
         // Status
-        auto *itemStatus = new QTableWidgetItem(formatRoomStatus(room.room_status));
+        auto *itemStatus = new QTableWidgetItem(formatRoomStatus(room.is_in_game));
         itemStatus->setFlags(itemStatus->flags() & ~Qt::ItemIsEditable);
         ui->tblRooms->setItem(row, 4, itemStatus);
 
@@ -224,26 +224,17 @@ void LobbyWindow::populateRoomTable(const QVector<RoomInfo> &rooms) {
     connect(ui->tblRooms, &QTableWidget::cellClicked, this, &LobbyWindow::onRoomTableItemClicked);
 }
 
-QString LobbyWindow::formatGameMode(uint8_t mode) const {
+QString LobbyWindow::formatGameMode(GameMode mode) const {
     switch (mode) {
-        case 0:
+        case GameMode::ELIMINATION:
             return "Elimination";
-        case 1:
+        case GameMode::SCORING:
             return "Scoring";
         default:
             return "Unknown";
     }
 }
 
-QString LobbyWindow::formatRoomStatus(uint8_t status) const {
-    switch (status) {
-        case 0:
-            return "Waiting";
-        case 1:
-            return "In Game";
-        case 2:
-            return "Finished";
-        default:
-            return "Unknown";
-    }
+QString LobbyWindow::formatRoomStatus(bool inGame) const {
+    return inGame ? "In Game" : "Waiting";
 }

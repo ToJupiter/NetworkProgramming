@@ -21,7 +21,7 @@ private slots:
     void onCreateClicked();
     void onCancelClicked();
     void onCreateRoomResponse(StatusCode code, const RoomInfo& room_info);
-    void onNetworkError(const QString &error);
+    void onConnectionError(const QString &error);
 
 private:
     void setupConnections();

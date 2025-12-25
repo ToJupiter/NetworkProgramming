@@ -6,6 +6,8 @@
 class SessionState {
 public:
     SessionState();
+    // Global singleton access
+    static SessionState& instance();
     
     // Authentication state
     bool isAuthenticated() const { return m_isAuthenticated; }

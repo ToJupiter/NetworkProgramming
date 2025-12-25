@@ -6,7 +6,7 @@
 CreateRoomDialog::CreateRoomDialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::CreateRoomDialog)
-    , networkManager(NetworkManager::instance())
+    , networkManager(&NetworkManager::instance())
 {
     ui->setupUi(this);
     setupConnections();
@@ -20,10 +20,10 @@ void CreateRoomDialog::setupConnections() {
     connect(ui->btnCreate, &QPushButton::clicked, this, &CreateRoomDialog::onCreateClicked);
     connect(ui->btnCancel, &QPushButton::clicked, this, &CreateRoomDialog::onCancelClicked);
 
-    connect(networkManager, &NetworkManager::createRoomResponse,
+        connect(networkManager, &NetworkManager::createRoomResponse,
             this, &CreateRoomDialog::onCreateRoomResponse);
-    connect(networkManager, &NetworkManager::networkError,
-            this, &CreateRoomDialog::onNetworkError);
+        connect(networkManager, &NetworkManager::connectionError,
+            this, &CreateRoomDialog::onConnectionError);
 }
 
 void CreateRoomDialog::onCreateClicked() {
@@ -32,10 +32,10 @@ void CreateRoomDialog::onCreateClicked() {
     }
 
     QString roomName = ui->edtRoomName->text().trimmed();
-    GameMode gameMode = (GameMode)ui->cmbGameMode->currentIndex();
-    uint8_t questionCount = ui->spinQuestionCount->value();
+    GameMode gameMode = static_cast<GameMode>(ui->cmbGameMode->currentIndex());
+    uint8_t questionCount = static_cast<uint8_t>(ui->spinQuestionCount->value());
 
-    networkManager->sendCreateRoom(roomName, gameMode, questionCount, maxPlayers);
+    networkManager->sendCreateRoom(roomName, gameMode, questionCount);
     this->accept();
 }
 
@@ -53,7 +53,7 @@ void CreateRoomDialog::onCreateRoomResponse(StatusCode code, const RoomInfo& roo
     }
 }
 
-void CreateRoomDialog::onNetworkError(const QString &error) {
+void CreateRoomDialog::onConnectionError(const QString &error) {
     ui->lblError->setText("Network error: " + error);
     QMessageBox::critical(this, "Network Error", error);
 }
