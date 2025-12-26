@@ -1,6 +1,7 @@
 #include "LobbyWindow.h"
 #include "ui_LobbyWindow.h"
 #include "CreateRoomDialog.h"
+#include "RoomWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 #include <QMessageBox>
@@ -11,6 +12,7 @@ LobbyWindow::LobbyWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::LobbyWindow)
     , networkManager(&NetworkManager::instance())
+    , roomWindow(nullptr)
     , refreshTimer(new QTimer(this))
     , selectedRoomIndex(-1)
 {
@@ -153,15 +155,16 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
 
         QMessageBox::information(this, "Room Joined",
             QString("Joined room '%1'!\n"
-                    "Players: %2\n"
-                    "Host: Player %3")
+                    "Players: %2")
                 .arg(room_info.room_name)
-                .arg(player_count)
-                .arg(host_user_id));
+                .arg(player_count));
 
-        // TODO: Transition to RoomWindow (Phase 4)
-        // For now, just refresh
-        onRefreshClicked();
+        // Transition to RoomWindow (Phase 4)
+        if (!roomWindow) {
+            roomWindow = new RoomWindow(room_info, host_user_id, players, this);
+        }
+        this->hide();
+        roomWindow->show();
     } else {
         QMessageBox::critical(this, "Join Room Failed",
             QString("Failed to join room. Error code: %1").arg((uint8_t)code));

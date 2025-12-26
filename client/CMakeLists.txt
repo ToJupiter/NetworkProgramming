@@ -22,7 +22,7 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
 
-# Source files (Phase 1-3)
+# Source files (Phase 1-4)
 set(SOURCES
     src/main.cpp
     src/network/NetworkManager.cpp
@@ -30,6 +30,7 @@ set(SOURCES
     src/ui/LoginWindow.cpp
     src/ui/LobbyWindow.cpp
     src/ui/CreateRoomDialog.cpp
+    src/ui/RoomWindow.cpp
     src/models/SessionState.cpp
     src/models/GameState.cpp
 )
@@ -40,6 +41,7 @@ set(HEADERS
     src/ui/LoginWindow.h
     src/ui/LobbyWindow.h
     src/ui/CreateRoomDialog.h
+    src/ui/RoomWindow.h
     src/models/SessionState.h
     src/models/GameState.h
     ../common/protocol.h
@@ -49,6 +51,7 @@ set(UI_FILES
     src/ui/LoginWindow.ui
     src/ui/LobbyWindow.ui
     src/ui/CreateRoomDialog.ui
+    src/ui/RoomWindow.ui
 )
 
 # Executable

@@ -7,6 +7,7 @@
 #include "protocol.h"
 
 class NetworkManager;
+class RoomWindow;
 
 namespace Ui {
 class LobbyWindow;
@@ -49,6 +50,7 @@ private:
 
     Ui::LobbyWindow *ui;
     NetworkManager *networkManager;
+    RoomWindow *roomWindow;
     QTimer *refreshTimer;
     QVector<RoomInfo> cachedRooms;
     int selectedRoomIndex;
