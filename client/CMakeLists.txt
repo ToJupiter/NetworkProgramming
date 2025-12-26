@@ -31,6 +31,7 @@ set(SOURCES
     src/ui/LobbyWindow.cpp
     src/ui/CreateRoomDialog.cpp
     src/ui/RoomWindow.cpp
+    src/ui/GameWindow.cpp
     src/models/SessionState.cpp
     src/models/GameState.cpp
 )
@@ -42,6 +43,7 @@ set(HEADERS
     src/ui/LobbyWindow.h
     src/ui/CreateRoomDialog.h
     src/ui/RoomWindow.h
+    src/ui/GameWindow.h
     src/models/SessionState.h
     src/models/GameState.h
     ../common/protocol.h
@@ -52,6 +54,7 @@ set(UI_FILES
     src/ui/LobbyWindow.ui
     src/ui/CreateRoomDialog.ui
     src/ui/RoomWindow.ui
+    src/ui/GameWindow.ui
 )
 
 # Executable

@@ -12,6 +12,7 @@ class RoomWindow;
 
 class NetworkManager;
 class SessionState;
+class GameWindow;
 
 class RoomWindow : public QMainWindow {
     Q_OBJECT
@@ -76,6 +77,7 @@ private:
     QTimer *countdownTimer = nullptr;         // Game start countdown
     uint8_t countdownSecondsRemaining = 0;
     QVector<PlayerInfo> cachedPlayers;
+    GameWindow *gameWindow = nullptr;
 };
 
 #endif // ROOMWINDOW_H

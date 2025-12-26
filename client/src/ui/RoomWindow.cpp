@@ -1,5 +1,6 @@
 #include "RoomWindow.h"
 #include "ui_RoomWindow.h"
+#include "GameWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 #include <algorithm>
@@ -165,10 +166,18 @@ void RoomWindow::onGameStartCountdown(uint8_t secondsRemaining)
 
 void RoomWindow::onGameStarted()
 {
-    // TODO: Phase 5 - Transition to GameWindow
-    QMessageBox::information(this, "Game Started", "The game has started!");
     stopAutoRefresh();
     stopCountdownTimer();
+
+    // Launch GameWindow with current players and room info
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+
+    gameWindow = new GameWindow(currentRoom.game_mode, currentRoom.room_id, hostUserId, cachedPlayers, this);
+    this->hide();
+    gameWindow->show();
 }
 
 void RoomWindow::onPlayerListUpdate(uint8_t playerCount, const QVector<PlayerInfo>& players)
