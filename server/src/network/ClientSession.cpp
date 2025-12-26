@@ -179,6 +179,20 @@ void ClientSession::handleListRooms() {
 
 void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
     if (state.currentRoomId != 0) {
+        // If the client requests the room they are already in, return success with current data
+        if (req->room_id == state.currentRoomId) {
+            Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+            if (room) {
+                JoinRoomResponse rsp{};
+                rsp.code = StatusCode::SUCCESS;
+                rsp.room_info = room->getRoomInfo();
+                rsp.host_user_id = room->getHostId();
+                room->getPlayerList(rsp);
+                sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
+                return;
+            }
+        }
+        // Otherwise reject cross-room joins
         JoinRoomResponse rsp{};
         rsp.code = StatusCode::FAILURE_GENERIC; 
         rsp.room_info.room_id = state.currentRoomId;
