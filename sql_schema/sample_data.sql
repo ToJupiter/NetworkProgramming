@@ -31,7 +31,7 @@ INSERT INTO users (email, display_name, hashed_password) VALUES
 ('adam.green@email.com', 'AdamG', '$2b$12$LUglNUen9MDK2nyV3nREvuXfIcUa.luRwvdVKGAHI2Vuxo9NZewdy'),
 ('bella.hall@email.com', 'BellaH', '$2b$12$R0jQrFcjtFegbuzgYA.SQ.sUe96frnP41Em1ahok6kTm2c.04BTe2'),
 ('charlie.nelson@email.com', 'CharlieN', '$2b$12$JD12NUpuJyIhMJmfECqEvOk/HX.TdIGlmpqMEL6SBql78gZh.cOPW'),
-('diana.mitchell@email.com', 'DianaM', '$2b$12$zsmfjqaht5xG2lK98lANp.hTT1tCjqrLDCRStQMnyP9jzF10lBDFC'),
+('diana.mitchell@email.com', 'DianaM', '$2b$12$zsmfjqaht5xG2lK98lANp.hTT1tCjqrLDCRStQMnyP9jzF10lBDFC');
 
 
 -- Insert sample questions (20 questions)
