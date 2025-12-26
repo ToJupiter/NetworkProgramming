@@ -182,11 +182,11 @@ void LoginWindow::onLoginResponse(StatusCode code, uint32_t userId, const QStrin
     
     if (code == StatusCode::SUCCESS) {
         // Store session state
-        SessionState::instance()->setAuthenticated(true);
-        SessionState::instance()->setUserId(userId);
-        SessionState::instance()->setDisplayName(displayName);
-        SessionState::instance()->setEmail(ui->txtLoginEmail->text().trimmed());
-        
+        SessionState::instance().setAuthenticated(true);
+        SessionState::instance().setUserId(userId);
+        SessionState::instance().setDisplayName(displayName);
+        SessionState::instance().setEmail(ui->txtLoginEmail->text().trimmed());
+
         clearError();
         
         // Hide LoginWindow and show LobbyWindow
