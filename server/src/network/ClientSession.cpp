@@ -96,6 +96,10 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
             if (state.isAuthenticated && body.size() >= sizeof(ReadyStatusRequest))
                 handleReadyStatus((const ReadyStatusRequest*)body.data());
             break;
+        case MessageType::C2S_START_GAME_REQ:
+            if (state.isAuthenticated)
+                handleStartGame();
+            break;
         case MessageType::C2S_SUBMIT_ANSWER_REQ:
             if (state.isAuthenticated && body.size() >= sizeof(SubmitAnswerRequest))
                 handleSubmitAnswer(reinterpret_cast<const SubmitAnswerRequest*>(body.data()));
@@ -247,6 +251,15 @@ void ClientSession::handleReadyStatus(const ReadyStatusRequest* req) {
     Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
     if (room) {
         room->setPlayerReady(state.userId, req->is_ready);
+    }
+}
+
+void ClientSession::handleStartGame() {
+    if (state.currentRoomId == 0) return;
+
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleStartGame(state.userId);
     }
 }
 

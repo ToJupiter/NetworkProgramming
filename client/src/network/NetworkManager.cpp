@@ -108,6 +108,11 @@ void NetworkManager::sendReadyStatus(bool ready) {
     sendMessage(MessageType::C2S_READY_STATUS_REQ, ProtocolHelper::packStruct(req));
 }
 
+void NetworkManager::sendStartGame() {
+    qDebug() << "[NetworkManager] Sending START_GAME_REQ";
+    sendMessage(MessageType::C2S_START_GAME_REQ, QByteArray());
+}
+
 void NetworkManager::sendSubmitAnswer(uint32_t questionId, uint8_t selectedOption, uint32_t responseTimeMs) {
     SubmitAnswerRequest req;
     req.question_id = questionId;

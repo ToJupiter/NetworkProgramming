@@ -152,10 +152,12 @@ void RoomWindow::onStartGameClicked()
         return;
     }
 
-    // Server controls game start and will broadcast S2C_GAME_START_NOTIF when ready.
-    // Avoid misleading popup; show waiting status and disable the button.
+    // Send start game request to server
+    networkManager->sendStartGame();
+    
+    // Disable button and show waiting status
     ui->btnStartGame->setEnabled(false);
-    ui->lblGameCountdown->setText("Waiting for server to start...");
+    ui->lblGameCountdown->setText("Starting game...");
 }
 
 void RoomWindow::onLeaveRoomClicked()

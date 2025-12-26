@@ -90,16 +90,42 @@ bool Room::setPlayerReady(uint32_t userId, bool ready) {
 
     broadcast(MessageType::S2C_READY_STATUS_NOTIF, &notif, sizeof(notif));
 
-    if (participants.size() >= 2) {
-        bool allReady = true;
-        for (const auto& p : participants) {
-            if (!p.second.isReady) { allReady = false; break; }
-        }
-        if (allReady) {
-            startGame();
+    // Auto-start disabled; wait for explicit C2S_START_GAME_REQ from host
+    return true;
+}
+
+void Room::handleStartGame(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    
+    // Only host can start the game
+    if (userId != hostUserId) {
+        std::cout << "[Room " << roomId << "] Non-host user " << userId 
+                  << " attempted to start game (denied)" << std::endl;
+        return;
+    }
+    
+    // Check if all players are ready
+    if (participants.size() < 2) {
+        std::cout << "[Room " << roomId << "] Cannot start: need at least 2 players" << std::endl;
+        return;
+    }
+    
+    bool allReady = true;
+    for (const auto& p : participants) {
+        if (!p.second.isReady) {
+            allReady = false;
+            break;
         }
     }
-    return true;
+    
+    if (!allReady) {
+        std::cout << "[Room " << roomId << "] Cannot start: not all players ready" << std::endl;
+        return;
+    }
+    
+    std::cout << "[Room " << roomId << "] Host starting game with " 
+              << participants.size() << " players" << std::endl;
+    startGame();
 }
 
 RoomInfo Room::getRoomInfo() const {

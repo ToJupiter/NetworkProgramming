@@ -24,6 +24,7 @@ public:
     void sendJoinRoom(uint32_t roomId);
     void sendLeaveRoom();
     void sendReadyStatus(bool ready);
+    void sendStartGame();
     void sendSubmitAnswer(uint32_t questionId, uint8_t selectedOption, uint32_t responseTimeMs);
     void sendGetStats();
     void sendPauseGame();
