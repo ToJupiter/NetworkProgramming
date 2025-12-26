@@ -43,10 +43,11 @@ void RoomWindow::show()
 void RoomWindow::setupUI()
 {
     // Update header with room info
+    // Initial header is based on current cached players; will be updated on join/leave events
     QString modeStr = (currentRoom.game_mode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
     QString headerText = QString("Room: %1 - Players: %2/%3 - Mode: %4")
         .arg(QString::fromLatin1(currentRoom.room_name, sizeof(currentRoom.room_name)))
-        .arg(currentRoom.current_players)
+        .arg(cachedPlayers.size())
         .arg(currentRoom.max_players)
         .arg(modeStr);
     ui->lblRoomInfo->setText(headerText);
@@ -127,6 +128,15 @@ void RoomWindow::onToggleReadyClicked()
     
     // Update button text
     ui->btnToggleReady->setText(isLocalPlayerReady ? "Mark Unready" : "Mark Ready");
+
+    // Optimistically update local table for immediate feedback
+    for (int i = 0; i < cachedPlayers.size(); ++i) {
+        if (cachedPlayers[i].user_id == sessionState->getUserId()) {
+            cachedPlayers[i].is_ready = isLocalPlayerReady;
+            break;
+        }
+    }
+    populatePlayerTable(cachedPlayers);
 }
 
 void RoomWindow::onStartGameClicked()
@@ -142,9 +152,10 @@ void RoomWindow::onStartGameClicked()
         return;
     }
 
-    // TODO: Add sendStartGame() to NetworkManager or use alternative message
-    // For now, just show message
-    QMessageBox::information(this, "Starting Game", "Game will start when all players are ready!");
+    // Server controls game start and will broadcast S2C_GAME_START_NOTIF when ready.
+    // Avoid misleading popup; show waiting status and disable the button.
+    ui->btnStartGame->setEnabled(false);
+    ui->lblGameCountdown->setText("Waiting for server to start...");
 }
 
 void RoomWindow::onLeaveRoomClicked()
@@ -189,7 +200,7 @@ void RoomWindow::onPlayerListUpdate(uint8_t playerCount, const QVector<PlayerInf
     QString modeStr = (currentRoom.game_mode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
     QString headerText = QString("Room: %1 - Players: %2/%3 - Mode: %4")
         .arg(QString::fromLatin1(currentRoom.room_name, sizeof(currentRoom.room_name)))
-        .arg(playerCount)
+        .arg(cachedPlayers.size())
         .arg(currentRoom.max_players)
         .arg(modeStr);
     ui->lblRoomInfo->setText(headerText);
@@ -204,23 +215,23 @@ void RoomWindow::onPlayerListUpdate(uint8_t playerCount, const QVector<PlayerInf
 
 void RoomWindow::onPlayerJoined(const PlayerInfo& player)
 {
-    // Add player to list
-    int rowCount = ui->tblPlayers->rowCount();
-    ui->tblPlayers->insertRow(rowCount);
-
-    QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromLatin1(player.display_name, sizeof(player.display_name)));
-    QTableWidgetItem *statusItem = new QTableWidgetItem(formatPlayerStatus(player.is_ready, true));
-    QTableWidgetItem *roleItem = new QTableWidgetItem(formatPlayerRole(player.user_id));
-
-    nameItem->setFlags(nameItem->flags() & ~Qt::ItemIsEditable);
-    statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
-    roleItem->setFlags(roleItem->flags() & ~Qt::ItemIsEditable);
-
-    ui->tblPlayers->setItem(rowCount, 0, nameItem);
-    ui->tblPlayers->setItem(rowCount, 1, statusItem);
-    ui->tblPlayers->setItem(rowCount, 2, roleItem);
-
+    // Update cache and rebuild table to keep indices consistent across clients
     cachedPlayers.append(player);
+    populatePlayerTable(cachedPlayers);
+
+    // Update header player count
+    QString modeStr = (currentRoom.game_mode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
+    QString headerText = QString("Room: %1 - Players: %2/%3 - Mode: %4")
+        .arg(QString::fromLatin1(currentRoom.room_name, sizeof(currentRoom.room_name)))
+        .arg(cachedPlayers.size())
+        .arg(currentRoom.max_players)
+        .arg(modeStr);
+    ui->lblRoomInfo->setText(headerText);
+
+    // Host button state may change depending on readiness
+    if (isLocalPlayerHost) {
+        if (allPlayersReady()) enableStartGameButton(); else disableStartGameButton();
+    }
 }
 
 void RoomWindow::onPlayerLeft(uint32_t userId)
@@ -232,6 +243,15 @@ void RoomWindow::onPlayerLeft(uint32_t userId)
         cachedPlayers.end()
     );
     populatePlayerTable(cachedPlayers);
+
+    // Update header player count
+    QString modeStr = (currentRoom.game_mode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
+    QString headerText = QString("Room: %1 - Players: %2/%3 - Mode: %4")
+        .arg(QString::fromLatin1(currentRoom.room_name, sizeof(currentRoom.room_name)))
+        .arg(cachedPlayers.size())
+        .arg(currentRoom.max_players)
+        .arg(modeStr);
+    ui->lblRoomInfo->setText(headerText);
 }
 
 void RoomWindow::onPlayerReadyChanged(uint32_t userId, bool isReady)
@@ -246,12 +266,8 @@ void RoomWindow::onPlayerReadyChanged(uint32_t userId, bool isReady)
         }
     }
 
-    if (targetRow >= 0) {
-        QTableWidgetItem *statusItem = ui->tblPlayers->item(targetRow, 1);
-        if (statusItem) {
-            statusItem->setText(isReady ? "Ready \u2713" : "Not Ready");
-        }
-    }
+    // Rebuild table to avoid row index mismatches across clients
+    populatePlayerTable(cachedPlayers);
 
     // Check if all players ready
     if (isLocalPlayerHost && allPlayersReady()) {
