@@ -15,6 +15,7 @@ LobbyWindow::LobbyWindow(QWidget *parent)
     , roomWindow(nullptr)
     , refreshTimer(new QTimer(this))
     , selectedRoomIndex(-1)
+    , joinInProgress(false)
 {
     ui->setupUi(this);
     setupUI();
@@ -52,6 +53,8 @@ void LobbyWindow::setupConnections() {
     connect(ui->btnCreateRoom, &QPushButton::clicked, this, &LobbyWindow::onCreateRoomClicked);
     connect(ui->btnStats, &QPushButton::clicked, this, &LobbyWindow::onStatsClicked);
     connect(ui->btnLogout, &QPushButton::clicked, this, &LobbyWindow::onLogoutClicked);
+    // Table click - connect once here (avoid reconnecting on every populate)
+    connect(ui->tblRooms, &QTableWidget::cellClicked, this, &LobbyWindow::onRoomTableItemClicked);
 
     // Network signals
     connect(networkManager, &NetworkManager::listRoomsResponse,
@@ -117,6 +120,7 @@ void LobbyWindow::onRoomTableItemClicked(int row, int column) {
             ui->lblStatus->setText(QString("Joining room '%1'...").arg(room.room_name));
 
             // Send join request
+            joinInProgress = true;
             networkManager->sendJoinRoom(room.room_id);
         }
     }
@@ -165,9 +169,14 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
         }
         this->hide();
         roomWindow->show();
+        joinInProgress = false;
     } else {
-        QMessageBox::critical(this, "Join Room Failed",
-            QString("Failed to join room. Error code: %1").arg((uint8_t)code));
+        // Only show the error dialog if this was triggered by a user-initiated join
+        if (joinInProgress) {
+            QMessageBox::critical(this, "Join Room Failed",
+                QString("Failed to join room. Error code: %1").arg((uint8_t)code));
+            joinInProgress = false;
+        }
     }
 }
 
@@ -223,8 +232,7 @@ void LobbyWindow::populateRoomTable(const QVector<RoomInfo> &rooms) {
         ui->tblRooms->setItem(row, 5, itemAction);
     }
 
-    // Connect table click signal
-    connect(ui->tblRooms, &QTableWidget::cellClicked, this, &LobbyWindow::onRoomTableItemClicked);
+    // Table click signal is connected once in setupConnections()
 }
 
 QString LobbyWindow::formatGameMode(GameMode mode) const {

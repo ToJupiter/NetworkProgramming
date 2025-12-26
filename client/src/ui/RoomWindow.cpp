@@ -44,7 +44,7 @@ void RoomWindow::setupUI()
     // Update header with room info
     QString modeStr = (currentRoom.game_mode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
     QString headerText = QString("Room: %1 - Players: %2/%3 - Mode: %4")
-        .arg(QString::fromLatin1(currentRoom.room_name))
+        .arg(QString::fromLatin1(currentRoom.room_name, sizeof(currentRoom.room_name)))
         .arg(currentRoom.current_players)
         .arg(currentRoom.max_players)
         .arg(modeStr);
@@ -179,7 +179,7 @@ void RoomWindow::onPlayerListUpdate(uint8_t playerCount, const QVector<PlayerInf
     // Update header
     QString modeStr = (currentRoom.game_mode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
     QString headerText = QString("Room: %1 - Players: %2/%3 - Mode: %4")
-        .arg(QString::fromLatin1(currentRoom.room_name))
+        .arg(QString::fromLatin1(currentRoom.room_name, sizeof(currentRoom.room_name)))
         .arg(playerCount)
         .arg(currentRoom.max_players)
         .arg(modeStr);
@@ -199,7 +199,7 @@ void RoomWindow::onPlayerJoined(const PlayerInfo& player)
     int rowCount = ui->tblPlayers->rowCount();
     ui->tblPlayers->insertRow(rowCount);
 
-    QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromLatin1(player.display_name));
+    QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromLatin1(player.display_name, sizeof(player.display_name)));
     QTableWidgetItem *statusItem = new QTableWidgetItem(formatPlayerStatus(player.is_ready, true));
     QTableWidgetItem *roleItem = new QTableWidgetItem(formatPlayerRole(player.user_id));
 
@@ -283,7 +283,7 @@ void RoomWindow::populatePlayerTable(const QVector<PlayerInfo>& players)
         int rowCount = ui->tblPlayers->rowCount();
         ui->tblPlayers->insertRow(rowCount);
 
-        QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromLatin1(player.display_name));
+        QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromLatin1(player.display_name, sizeof(player.display_name)));
         QTableWidgetItem *statusItem = new QTableWidgetItem(formatPlayerStatus(player.is_ready, true));
         QTableWidgetItem *roleItem = new QTableWidgetItem(formatPlayerRole(player.user_id));
 

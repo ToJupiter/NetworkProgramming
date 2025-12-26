@@ -90,6 +90,7 @@ void NetworkManager::sendListRooms() {
 }
 
 void NetworkManager::sendJoinRoom(uint32_t roomId) {
+    qDebug() << "[NetworkManager] Sending JOIN_ROOM_REQ for roomId=" << roomId;
     JoinRoomRequest req;
     req.room_id = roomId;
     
@@ -210,6 +211,9 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         
         case MessageType::S2C_JOIN_ROOM_RSP: {
             auto resp = ProtocolHelper::unpackStruct<JoinRoomResponse>(body);
+            qDebug() << "[NetworkManager] Received JOIN_ROOM_RSP: code=" << (int)resp.code 
+                     << "roomId=" << resp.room_info.room_id 
+                     << "playerCount=" << (int)resp.player_count;
             QVector<PlayerInfo> players;
             for (int i = 0; i < resp.player_count; ++i) {
                 players.append(resp.players[i]);

@@ -54,6 +54,7 @@ private:
     QTimer *refreshTimer;
     QVector<RoomInfo> cachedRooms;
     int selectedRoomIndex;
+    bool joinInProgress;
 };
 
 #endif // LOBBYWINDOW_H
