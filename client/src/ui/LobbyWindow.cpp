@@ -186,13 +186,14 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
         // Store room info in session
         session.setCurrentRoomId(room_info.room_id);
 
-        if (code == StatusCode::SUCCESS) {
-            QMessageBox::information(this, "Room Joined",
-                QString("Joined room '%1'!\n"
-                        "Players: %2")
-                    .arg(room_info.room_name)
-                    .arg(player_count));
-        }
+        QMessageBox::information(this, "Room Joined",
+            QString("Joined room '%1'!\n"
+                    "Players: %2")
+                .arg(room_info.room_name)
+                .arg(player_count));
+
+        // Stop auto-refresh before transitioning away
+        stopAutoRefresh();
 
         // Transition to RoomWindow (Phase 4)
         if (!roomWindow) {
@@ -216,6 +217,7 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
 
         if (found) {
             ui->lblStatus->setText("Opening your room view...");
+            stopAutoRefresh();
             if (!roomWindow) {
                 roomWindow = new RoomWindow(currentRoomInfo, /*host_user_id*/ myUserId, QVector<PlayerInfo>{}, this);
             }
