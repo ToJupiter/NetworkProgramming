@@ -1,7 +1,8 @@
 #include "RoomWindow.h"
 #include "ui_RoomWindow.h"
-#include "NetworkManager.h"
-#include "SessionState.h"
+#include "../network/NetworkManager.h"
+#include "../models/SessionState.h"
+#include <algorithm>
 #include <QMessageBox>
 #include <QTableWidgetItem>
 
@@ -198,7 +199,7 @@ void RoomWindow::onPlayerJoined(const PlayerInfo& player)
     int rowCount = ui->tblPlayers->rowCount();
     ui->tblPlayers->insertRow(rowCount);
 
-    QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromStdString(player.player_name));
+    QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromLatin1(player.display_name));
     QTableWidgetItem *statusItem = new QTableWidgetItem(formatPlayerStatus(player.is_ready, true));
     QTableWidgetItem *roleItem = new QTableWidgetItem(formatPlayerRole(player.user_id));
 
@@ -215,18 +216,13 @@ void RoomWindow::onPlayerJoined(const PlayerInfo& player)
 
 void RoomWindow::onPlayerLeft(uint32_t userId)
 {
-    // Remove player from list
-    for (int row = 0; row < ui->tblPlayers->rowCount(); ++row) {
-        // We need to track userId in the table, for now remove by name matching
-        // This is a simplified version
-    }
-
-    // Remove from cached players
+    // Remove from cached players by userId and repopulate table
     cachedPlayers.erase(
         std::remove_if(cachedPlayers.begin(), cachedPlayers.end(),
             [userId](const PlayerInfo& p) { return p.user_id == userId; }),
         cachedPlayers.end()
     );
+    populatePlayerTable(cachedPlayers);
 }
 
 void RoomWindow::onPlayerReadyChanged(uint32_t userId, bool isReady)
@@ -287,7 +283,7 @@ void RoomWindow::populatePlayerTable(const QVector<PlayerInfo>& players)
         int rowCount = ui->tblPlayers->rowCount();
         ui->tblPlayers->insertRow(rowCount);
 
-        QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromStdString(player.player_name));
+        QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromLatin1(player.display_name));
         QTableWidgetItem *statusItem = new QTableWidgetItem(formatPlayerStatus(player.is_ready, true));
         QTableWidgetItem *roleItem = new QTableWidgetItem(formatPlayerRole(player.user_id));
 
