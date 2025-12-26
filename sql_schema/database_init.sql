@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL,
     hashed_password TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ranked_points INTEGER DEFAULT 1000
 );
 
 -- Table to store all quiz questions
@@ -26,7 +27,8 @@ CREATE TABLE IF NOT EXISTS game_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     game_mode TEXT NOT NULL, -- e.g., 'Elimination', 'Scoring'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ended_at DATETIME
+    ended_at DATETIME,
+    total_pause_duration_ms INTEGER DEFAULT 0
 );
 
 -- Table to link users to game sessions and store their results
