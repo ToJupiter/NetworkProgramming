@@ -115,6 +115,10 @@ void LobbyWindow::onLogoutClicked() {
 void LobbyWindow::onRoomTableItemClicked(int row, int column) {
     if (column == 5) { // Action column (Join button)
         if (row >= 0 && row < cachedRooms.size()) {
+            // Prevent duplicate join attempts while one is in progress
+            if (joinInProgress) {
+                return;
+            }
             selectedRoomIndex = row;
             RoomInfo room = cachedRooms[row];
             ui->lblStatus->setText(QString("Joining room '%1'...").arg(room.room_name));
@@ -143,6 +147,8 @@ void LobbyWindow::onCreateRoomResponse(StatusCode code, const RoomInfo& room_inf
             QString("Room '%1' created successfully!\nRoom ID: %2")
                 .arg(room_info.room_name)
                 .arg(room_info.room_id));
+        // Host is placed into the room upon creation; track it
+        SessionState::instance().setCurrentRoomId(room_info.room_id);
         onRefreshClicked(); // Refresh room list
     } else {
         QMessageBox::critical(this, "Create Room Failed",
@@ -153,15 +159,24 @@ void LobbyWindow::onCreateRoomResponse(StatusCode code, const RoomInfo& room_inf
 void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
                                      uint8_t player_count, const QVector<PlayerInfo>& players,
                                      uint32_t host_user_id) {
-    if (code == StatusCode::SUCCESS) { // Success
+    const uint32_t myUserId = SessionState::instance().getUserId();
+    const bool isHostOfThisRoom = (host_user_id != 0 && host_user_id == myUserId);
+    const bool canProceedDespiteError = (code != StatusCode::SUCCESS && isHostOfThisRoom);
+
+    if (code == StatusCode::SUCCESS || canProceedDespiteError) { // Success or host already in room
         // Store room info in session
         SessionState::instance().setCurrentRoomId(room_info.room_id);
 
-        QMessageBox::information(this, "Room Joined",
-            QString("Joined room '%1'!\n"
-                    "Players: %2")
-                .arg(room_info.room_name)
-                .arg(player_count));
+        if (code == StatusCode::SUCCESS) {
+            QMessageBox::information(this, "Room Joined",
+                QString("Joined room '%1'!\n"
+                        "Players: %2")
+                    .arg(room_info.room_name)
+                    .arg(player_count));
+        } else {
+            // Host case: open room view using provided payload even if server returned a failure code
+            ui->lblStatus->setText("Opening your room view...");
+        }
 
         // Transition to RoomWindow (Phase 4)
         if (!roomWindow) {
@@ -203,8 +218,8 @@ void LobbyWindow::populateRoomTable(const QVector<RoomInfo> &rooms) {
         itemId->setFlags(itemId->flags() & ~Qt::ItemIsEditable);
         ui->tblRooms->setItem(row, 0, itemId);
 
-        // Room Name
-        auto *itemName = new QTableWidgetItem(room.room_name);
+        // Room Name (bounded conversion from fixed-size char array)
+        auto *itemName = new QTableWidgetItem(QString::fromLatin1(room.room_name, sizeof(room.room_name)));
         itemName->setFlags(itemName->flags() & ~Qt::ItemIsEditable);
         ui->tblRooms->setItem(row, 1, itemName);
 

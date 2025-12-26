@@ -227,20 +227,20 @@ void RoomWindow::onPlayerLeft(uint32_t userId)
 
 void RoomWindow::onPlayerReadyChanged(uint32_t userId, bool isReady)
 {
-    // Update player ready status in table
-    for (int row = 0; row < ui->tblPlayers->rowCount(); ++row) {
-        // Update status column
-        QTableWidgetItem *statusItem = ui->tblPlayers->item(row, 1);
-        if (statusItem) {
-            statusItem->setText(isReady ? "Ready ✓" : "Not Ready");
+    // Update cached players and corresponding table row only for the target user
+    int targetRow = -1;
+    for (int i = 0; i < cachedPlayers.size(); ++i) {
+        if (cachedPlayers[i].user_id == userId) {
+            cachedPlayers[i].is_ready = isReady;
+            targetRow = i;
+            break;
         }
     }
 
-    // Update cached players
-    for (auto& player : cachedPlayers) {
-        if (player.user_id == userId) {
-            player.is_ready = isReady;
-            break;
+    if (targetRow >= 0) {
+        QTableWidgetItem *statusItem = ui->tblPlayers->item(targetRow, 1);
+        if (statusItem) {
+            statusItem->setText(isReady ? "Ready \u2713" : "Not Ready");
         }
     }
 
