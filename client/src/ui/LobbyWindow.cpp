@@ -121,6 +121,26 @@ void LobbyWindow::onRoomTableItemClicked(int row, int column) {
             }
             selectedRoomIndex = row;
             RoomInfo room = cachedRooms[row];
+
+            // If already in a room, prevent cross-room joins. If the selected room
+            // is the one we're already in, simply open it without sending a join.
+            auto &session = SessionState::instance();
+            if (session.isInRoom()) {
+                if (session.getCurrentRoomId() == room.room_id) {
+                    ui->lblStatus->setText("Opening your room view...");
+                    // Open RoomWindow using known room info; player list will populate via notifications
+                    if (!roomWindow) {
+                        roomWindow = new RoomWindow(room, /*host_user_id*/ session.getUserId(), QVector<PlayerInfo>{}, this);
+                    }
+                    this->hide();
+                    roomWindow->show();
+                    return;
+                } else {
+                    QMessageBox::information(this, "Already in a room",
+                        "You are already in a room. Please leave it before joining another.");
+                    return;
+                }
+            }
             ui->lblStatus->setText(QString("Joining room '%1'...").arg(room.room_name));
 
             // Send join request
@@ -159,13 +179,12 @@ void LobbyWindow::onCreateRoomResponse(StatusCode code, const RoomInfo& room_inf
 void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
                                      uint8_t player_count, const QVector<PlayerInfo>& players,
                                      uint32_t host_user_id) {
-    const uint32_t myUserId = SessionState::instance().getUserId();
-    const bool isHostOfThisRoom = (host_user_id != 0 && host_user_id == myUserId);
-    const bool canProceedDespiteError = (code != StatusCode::SUCCESS && isHostOfThisRoom);
+    auto &session = SessionState::instance();
+    const uint32_t myUserId = session.getUserId();
 
-    if (code == StatusCode::SUCCESS || canProceedDespiteError) { // Success or host already in room
+    if (code == StatusCode::SUCCESS) { // Success
         // Store room info in session
-        SessionState::instance().setCurrentRoomId(room_info.room_id);
+        session.setCurrentRoomId(room_info.room_id);
 
         if (code == StatusCode::SUCCESS) {
             QMessageBox::information(this, "Room Joined",
@@ -173,9 +192,6 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
                         "Players: %2")
                     .arg(room_info.room_name)
                     .arg(player_count));
-        } else {
-            // Host case: open room view using provided payload even if server returned a failure code
-            ui->lblStatus->setText("Opening your room view...");
         }
 
         // Transition to RoomWindow (Phase 4)
@@ -185,13 +201,36 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
         this->hide();
         roomWindow->show();
         joinInProgress = false;
-    } else {
-        // Only show the error dialog if this was triggered by a user-initiated join
-        if (joinInProgress) {
-            QMessageBox::critical(this, "Join Room Failed",
-                QString("Failed to join room. Error code: %1").arg((uint8_t)code));
-            joinInProgress = false;
+        return;
+    }
+
+    // Non-success path. If we are already in a room, silently open the current room view.
+    if (session.isInRoom()) {
+        const uint32_t currentRoomId = session.getCurrentRoomId();
+        // Try to find the room info from the cached list
+        RoomInfo currentRoomInfo{};
+        bool found = false;
+        for (const auto &r : cachedRooms) {
+            if (r.room_id == currentRoomId) { currentRoomInfo = r; found = true; break; }
         }
+
+        if (found) {
+            ui->lblStatus->setText("Opening your room view...");
+            if (!roomWindow) {
+                roomWindow = new RoomWindow(currentRoomInfo, /*host_user_id*/ myUserId, QVector<PlayerInfo>{}, this);
+            }
+            this->hide();
+            roomWindow->show();
+            joinInProgress = false;
+            return;
+        }
+    }
+
+    // Otherwise, show error dialog only once if user initiated
+    if (joinInProgress) {
+        QMessageBox::critical(this, "Join Room Failed",
+            QString("Failed to join room. Error code: %1").arg((uint8_t)code));
+        joinInProgress = false;
     }
 }
 

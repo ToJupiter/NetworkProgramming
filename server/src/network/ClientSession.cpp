@@ -179,23 +179,26 @@ void ClientSession::handleListRooms() {
 
 void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
     if (state.currentRoomId != 0) {
-        JoinRoomResponse rsp;
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::FAILURE_GENERIC; 
+        rsp.room_info.room_id = state.currentRoomId;
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
         return;
     }
 
     Room* room = server->getRoomManager()->getRoom(req->room_id);
     if (!room) {
-        JoinRoomResponse rsp;
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::ROOM_NOT_FOUND;
+        rsp.room_info.room_id = req->room_id;
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
         return;
     }
 
     if (room->isFull()) {
-        JoinRoomResponse rsp;
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::ROOM_FULL;
+        rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
         return;
     }
@@ -209,8 +212,9 @@ void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
         room->getPlayerList(rsp);
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
     } else {
-        JoinRoomResponse rsp;
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::GAME_IN_PROGRESS;
+        rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
     }
 }
