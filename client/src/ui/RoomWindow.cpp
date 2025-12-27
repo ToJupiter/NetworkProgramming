@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <QMessageBox>
 #include <QTableWidgetItem>
+#include <QtGlobal>
 
 RoomWindow::RoomWindow(const RoomInfo& roomInfo, uint32_t hostUserId, 
                        const QVector<PlayerInfo>& players, QWidget *parent)
@@ -111,12 +112,12 @@ void RoomWindow::setupConnections()
             });
     
     // For player notifications
-    connect(networkManager, &NetworkManager::playerJoinedNotif,
+        connect(networkManager, &NetworkManager::playerJoinedNotif,
             this, &RoomWindow::onPlayerJoined);
-    connect(networkManager, &NetworkManager::playerLeftNotif,
+        connect(networkManager, &NetworkManager::playerLeftNotif,
             this, &RoomWindow::onPlayerLeft);
         connect(networkManager, &NetworkManager::playerListUpdate,
-            this, &RoomWindow::onPlayerListUpdate);
+            this, qOverload<uint8_t, const QVector<PlayerInfo>&, uint32_t>(&RoomWindow::onPlayerListUpdate));
         connect(networkManager, &NetworkManager::leaveRoomResponse,
             this, &RoomWindow::onLeaveRoomResponse);
         connect(networkManager, &NetworkManager::roomClosedNotif,

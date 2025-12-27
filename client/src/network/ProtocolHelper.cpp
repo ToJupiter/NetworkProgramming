@@ -3,6 +3,20 @@
 // Linux/WSL: use POSIX networking byte order functions
 #include <arpa/inet.h>
 
+// Avoid macro substitution of hton* when defining class methods
+#ifdef htonl
+#undef htonl
+#endif
+#ifdef ntohl
+#undef ntohl
+#endif
+#ifdef htons
+#undef htons
+#endif
+#ifdef ntohs
+#undef ntohs
+#endif
+
 QByteArray ProtocolHelper::createMessage(MessageType type, const QByteArray& body) {
     MessageHeader header;
     header.type = type;
