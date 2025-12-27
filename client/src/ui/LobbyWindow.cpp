@@ -2,6 +2,7 @@
 #include "ui_LobbyWindow.h"
 #include "CreateRoomDialog.h"
 #include "RoomWindow.h"
+#include "StatsWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 #include <QMessageBox>
@@ -13,6 +14,7 @@ LobbyWindow::LobbyWindow(QWidget *parent)
     , ui(new Ui::LobbyWindow)
     , networkManager(&NetworkManager::instance())
     , roomWindow(nullptr)
+    , statsWindow(nullptr)
     , refreshTimer(new QTimer(this))
     , selectedRoomIndex(-1)
     , joinInProgress(false)
@@ -63,6 +65,8 @@ void LobbyWindow::setupConnections() {
             this, &LobbyWindow::onCreateRoomResponse);
     connect(networkManager, &NetworkManager::joinRoomResponse,
             this, &LobbyWindow::onJoinRoomResponse);
+        connect(networkManager, &NetworkManager::statsResponse,
+            this, &LobbyWindow::onStatsResponse);
         connect(networkManager, &NetworkManager::connectionError,
             this, &LobbyWindow::onConnectionError);
 
@@ -92,12 +96,26 @@ void LobbyWindow::onCreateRoomClicked() {
 }
 
 void LobbyWindow::onStatsClicked() {
-    QMessageBox::information(this, "Statistics",
-        "Player stats view coming in Phase 5.\n\n"
-        "Current features:\n"
-        "- Join available rooms\n"
-        "- Create new rooms\n"
-        "- Play quiz games");
+    if (!statsWindow) {
+        statsWindow = new StatsWindow(this);
+    }
+
+    statsWindow->showLoading();
+    statsWindow->show();
+    statsWindow->raise();
+    statsWindow->activateWindow();
+
+    networkManager->sendGetStats();
+}
+
+void LobbyWindow::onStatsResponse(const UserStatsResponse& stats) {
+    if (!statsWindow) {
+        statsWindow = new StatsWindow(this);
+    }
+    statsWindow->setStats(stats);
+    statsWindow->show();
+    statsWindow->raise();
+    statsWindow->activateWindow();
 }
 
 void LobbyWindow::onLogoutClicked() {

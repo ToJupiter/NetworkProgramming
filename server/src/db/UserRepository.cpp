@@ -36,6 +36,8 @@ UserStatsResponse UserRepository::getUserStats(uint32_t userId) {
     } catch (const std::exception &e) {
         std::cerr << "DB Error getting stats: " << e.what() << std::endl;
     }
+
+    return stats;
 }
 
 void UserRepository::updateUserRanks(const std::vector<RankUpdateInfo>& results) {

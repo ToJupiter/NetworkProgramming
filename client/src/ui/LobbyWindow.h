@@ -8,6 +8,7 @@
 
 class NetworkManager;
 class RoomWindow;
+class StatsWindow;
 
 namespace Ui {
 class LobbyWindow;
@@ -34,6 +35,7 @@ private slots:
     void onJoinRoomResponse(StatusCode code, const RoomInfo& room_info, 
                             uint8_t player_count, const QVector<PlayerInfo>& players, uint32_t host_user_id);
     void onConnectionError(const QString &error);
+    void onStatsResponse(const UserStatsResponse& stats);
 
     // Timer slot
     void onRefreshTimer();
@@ -51,6 +53,7 @@ private:
     Ui::LobbyWindow *ui;
     NetworkManager *networkManager;
     RoomWindow *roomWindow;
+    StatsWindow *statsWindow;
     QTimer *refreshTimer;
     QVector<RoomInfo> cachedRooms;
     int selectedRoomIndex;
