@@ -34,10 +34,13 @@ private slots:
     void onGameStartCountdown(uint8_t secondsRemaining);
     void onGameStarted();
     void onPlayerListUpdate(uint8_t playerCount, const QVector<PlayerInfo>& players);
+    void onPlayerListUpdate(uint8_t playerCount, const QVector<PlayerInfo>& players, uint32_t hostUserId);
     void onPlayerJoined(const PlayerInfo& player);
     void onPlayerLeft(uint32_t userId);
     void onPlayerReadyChanged(uint32_t userId, bool isReady);
     void onReturnedToRoom();
+    void onLeaveRoomResponse(StatusCode code);
+    void onRoomClosed(uint32_t roomId);
 
     // Network error
     void onNetworkError(const QString& error);

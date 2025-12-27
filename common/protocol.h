@@ -28,7 +28,10 @@ enum class MessageType : uint16_t {
     S2C_JOIN_ROOM_RSP,
     S2C_PLAYER_JOINED_NOTIF,
     C2S_LEAVE_ROOM_REQ,
+    S2C_LEAVE_ROOM_RSP,
     S2C_PLAYER_LEFT_NOTIF,
+    S2C_PLAYER_LIST_UPDATE,
+    S2C_ROOM_CLOSED_NOTIF,
     C2S_READY_STATUS_REQ,
     S2C_READY_STATUS_NOTIF,
     C2S_START_GAME_REQ,
@@ -158,6 +161,20 @@ struct JoinRoomResponse {
 struct PlayerLeftNotification {
     uint32_t user_id;
     uint32_t new_host_user_id;
+};
+
+struct LeaveRoomResponse {
+    StatusCode code;
+};
+
+struct PlayerListUpdate {
+    uint8_t player_count;
+    PlayerInfo players[MAX_PLAYERS_PER_ROOM];
+    uint32_t host_user_id;
+};
+
+struct RoomClosedNotification {
+    uint32_t room_id;
 };
 
 struct ReadyStatusRequest {

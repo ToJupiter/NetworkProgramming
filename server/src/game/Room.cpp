@@ -548,3 +548,32 @@ void Room::terminateGame(TerminationReason reason) {
 
     persistResults(sortedPlayers, reason);
 }
+
+void Room::broadcastRoomClosed() {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    RoomClosedNotification notif;
+    notif.room_id = roomId;
+    broadcast(MessageType::S2C_ROOM_CLOSED_NOTIF, &notif, sizeof(notif));
+}
+
+void Room::sendPlayerListUpdate() {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    PlayerListUpdate update;
+    update.player_count = static_cast<uint8_t>(participants.size());
+    update.host_user_id = hostUserId;
+
+    int idx = 0;
+    for (const auto& pair : participants) {
+        if (idx >= MAX_PLAYERS_PER_ROOM) break;
+        const PlayerGameData& data = pair.second;
+        update.players[idx].user_id = pair.first;
+        update.players[idx].is_ready = data.isReady;
+        std::strncpy(update.players[idx].display_name,
+                     data.session->getDisplayName().c_str(),
+                     MAX_DISPLAY_NAME_LEN - 1);
+        update.players[idx].display_name[MAX_DISPLAY_NAME_LEN - 1] = '\0';
+        idx++;
+    }
+
+    broadcast(MessageType::S2C_PLAYER_LIST_UPDATE, &update, sizeof(update));
+}

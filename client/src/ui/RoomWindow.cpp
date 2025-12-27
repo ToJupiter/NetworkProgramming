@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <QMessageBox>
 #include <QTableWidgetItem>
+#include <QtGlobal>
 
 RoomWindow::RoomWindow(const RoomInfo& roomInfo, uint32_t hostUserId, 
                        const QVector<PlayerInfo>& players, QWidget *parent)
@@ -116,6 +117,14 @@ void RoomWindow::setupConnections()
     connect(networkManager, &NetworkManager::playerLeftNotif,
             this, &RoomWindow::onPlayerLeft);
     
+    // Leave room and room closed notifications
+    connect(networkManager, &NetworkManager::leaveRoomResponse,
+            this, &RoomWindow::onLeaveRoomResponse);
+    connect(networkManager, &NetworkManager::playerListUpdate,
+            this, qOverload<uint8_t, const QVector<PlayerInfo>&, uint32_t>(&RoomWindow::onPlayerListUpdate));
+    connect(networkManager, &NetworkManager::roomClosedNotif,
+            this, &RoomWindow::onRoomClosed);
+    
     // Network error
     connect(networkManager, &NetworkManager::connectionError,
             this, &RoomWindow::onNetworkError);
@@ -186,7 +195,8 @@ void RoomWindow::onLeaveRoomClicked()
 
     if (reply == QMessageBox::Yes) {
         networkManager->sendLeaveRoom();
-        this->close();
+        ui->btnLeaveRoom->setEnabled(false);
+        ui->lblError->setText("Leaving room...");
     }
 }
 
@@ -230,6 +240,26 @@ void RoomWindow::onPlayerListUpdate(uint8_t playerCount, const QVector<PlayerInf
     ui->lblRoomInfo->setText(headerText);
 
     // Check if all players ready
+    if (isLocalPlayerHost && allPlayersReady()) {
+        enableStartGameButton();
+    } else if (isLocalPlayerHost) {
+        disableStartGameButton();
+    }
+}
+
+void RoomWindow::onPlayerListUpdate(uint8_t /*playerCount*/, const QVector<PlayerInfo>& players, uint32_t hostId)
+{
+    cachedPlayers = players;
+    hostUserId = hostId;
+    populatePlayerTable(players);
+    // Update header
+    QString modeStr = (currentRoom.game_mode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
+    QString headerText = QString("Room: %1 - Players: %2/%3 - Mode: %4")
+        .arg(QString::fromLatin1(currentRoom.room_name, sizeof(currentRoom.room_name)))
+        .arg(cachedPlayers.size())
+        .arg(currentRoom.max_players)
+        .arg(modeStr);
+    ui->lblRoomInfo->setText(headerText);
     if (isLocalPlayerHost && allPlayersReady()) {
         enableStartGameButton();
     } else if (isLocalPlayerHost) {
@@ -437,4 +467,42 @@ void RoomWindow::onReturnedToRoom()
     
     // Restart auto-refresh to sync player list
     setupAutoRefresh();
+}
+
+void RoomWindow::onLeaveRoomResponse(StatusCode code)
+{
+    if (code == StatusCode::SUCCESS) {
+        SessionState::instance().setCurrentRoomId(0);
+        if (gameWindow) {
+            gameWindow->close();
+            gameWindow = nullptr;
+        }
+        this->hide();
+        if (parentWidget()) {
+            parentWidget()->show();
+            parentWidget()->raise();
+            parentWidget()->activateWindow();
+        }
+        ui->btnLeaveRoom->setEnabled(true);
+    } else {
+        ui->lblError->setText("Failed to leave room.");
+        ui->btnLeaveRoom->setEnabled(true);
+    }
+}
+
+void RoomWindow::onRoomClosed(uint32_t /*roomId*/)
+{
+    QMessageBox::information(this, "Room Closed", "Room closed by Host");
+    SessionState::instance().setCurrentRoomId(0);
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+    this->hide();
+    if (parentWidget()) {
+        parentWidget()->show();
+        parentWidget()->raise();
+        parentWidget()->activateWindow();
+    }
+    ui->btnLeaveRoom->setEnabled(true);
 }

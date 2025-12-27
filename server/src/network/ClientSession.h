@@ -12,6 +12,7 @@ struct SessionState {
     uint32_t userId = 0;
     std::string displayName;
     uint32_t currentRoomId = 0;
+    bool isRoomHost = false;
 };
 
 class ClientSession {

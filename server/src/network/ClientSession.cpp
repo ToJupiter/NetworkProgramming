@@ -20,7 +20,7 @@ ClientSession::~ClientSession() {
 
 void ClientSession::onDisconnect() {
     if (state.currentRoomId != 0) {
-        server->getRoomManager()->leaveRoom(state.currentRoomId, state.userId);
+        server->getRoomManager()->leaveRoom(state.currentRoomId, state.userId, state.isRoomHost);
         state.currentRoomId = 0;
     }
 }
@@ -235,6 +235,7 @@ void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
 
     if (room->addPlayer(this)) {
         state.currentRoomId = room->getId();
+        state.isRoomHost = (room->getHostId() == state.userId);
         JoinRoomResponse rsp;
         rsp.code = StatusCode::SUCCESS;
         rsp.room_info = room->getRoomInfo();
@@ -250,11 +251,19 @@ void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
 }
 
 void ClientSession::handleLeaveRoom() {
-    if (state.currentRoomId == 0) return;
+    if (state.currentRoomId == 0) {
+        LeaveRoomResponse resp;
+        resp.code = StatusCode::ROOM_NOT_FOUND;
+        sendResponse(MessageType::S2C_LEAVE_ROOM_RSP, &resp, sizeof(resp));
+        return;
+    }
     
-    server->getRoomManager()->leaveRoom(state.currentRoomId, state.userId);
+    bool roomDeleted = server->getRoomManager()->leaveRoom(state.currentRoomId, state.userId, state.isRoomHost);
     state.currentRoomId = 0;
     
+    LeaveRoomResponse resp;
+    resp.code = StatusCode::SUCCESS;
+    sendResponse(MessageType::S2C_LEAVE_ROOM_RSP, &resp, sizeof(resp));
 }
 
 void ClientSession::handleReadyStatus(const ReadyStatusRequest* req) {

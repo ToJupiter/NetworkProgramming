@@ -53,6 +53,8 @@ public:
     RoomInfo getRoomInfo() const;
     void getPlayerList(JoinRoomResponse& response) const;
 
+        void broadcastRoomClosed();
+        void sendPlayerListUpdate();
 
 private:
     void broadcast(MessageType type, const void* data, uint32_t len, uint32_t excludeUserId = 0);
