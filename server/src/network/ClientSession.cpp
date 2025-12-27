@@ -104,6 +104,9 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
             if (state.isAuthenticated && body.size() >= sizeof(SubmitAnswerRequest))
                 handleSubmitAnswer(reinterpret_cast<const SubmitAnswerRequest*>(body.data()));
             break;
+        case MessageType::C2S_RETURN_TO_ROOM_REQ:
+            if (state.isAuthenticated) handleReturnToRoom();
+            break;
         case MessageType::C2S_GET_STATS_REQ:
             if (state.isAuthenticated) handleGetStats();
             break;
@@ -317,6 +320,17 @@ void ClientSession::handleSubmitAnswer(const SubmitAnswerRequest* req) {
 void ClientSession::handleGetStats() {
     UserStatsResponse stats = UserRepository::getUserStats(state.userId);
     sendResponse(MessageType::S2C_GET_STATS_RSP, &stats, sizeof(stats));
+}
+
+void ClientSession::handleReturnToRoom() {
+    if (state.currentRoomId == 0) return;
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleReturnToRoom(state.userId);
+        StatusResponse rsp;
+        rsp.code = StatusCode::SUCCESS;
+        sendResponse(MessageType::S2C_RETURN_TO_ROOM_RSP, &rsp, sizeof(rsp));
+    }
 }
 
 void ClientSession::handlePauseGame() {

@@ -128,6 +128,36 @@ void Room::handleStartGame(uint32_t userId) {
     startGame();
 }
 
+void Room::handleReturnToRoom(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    
+    auto it = participants.find(userId);
+    if (it == participants.end()) return;
+    
+    // Reset player to waiting/not ready state
+    it->second.isReady = false;
+    it->second.score = 0;
+    it->second.isEliminated = false;
+    it->second.hasAnswered = false;
+    it->second.selectedOption = 0;
+    it->second.lastResponseTimeMs = 0;
+    it->second.lastScoreChange = 0;
+    
+    // Reset room to WAITING if it was FINISHED
+    if (state == RoomState::FINISHED) {
+        state = RoomState::WAITING;
+        currentQuestionIndex = 0;
+        questions.clear();
+        pendingLogs.clear();
+    }
+    
+    // Broadcast updated ready status to all players
+    ReadyStatusNotification notif;
+    notif.user_id = userId;
+    notif.is_ready = false;
+    broadcast(MessageType::S2C_READY_STATUS_NOTIF, &notif, sizeof(notif));
+}
+
 RoomInfo Room::getRoomInfo() const {
     std::lock_guard<std::mutex> lock(roomMutex);
     RoomInfo info;

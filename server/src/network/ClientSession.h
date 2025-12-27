@@ -42,6 +42,7 @@ private:
     void handleReadyStatus(const ReadyStatusRequest* req);
     void handleStartGame();
     void handleSubmitAnswer(const SubmitAnswerRequest* req);
+    void handleReturnToRoom();
     void handleGetStats();
     void handlePauseGame();
     void handleResumeGame();

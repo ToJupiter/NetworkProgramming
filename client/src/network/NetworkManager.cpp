@@ -122,6 +122,10 @@ void NetworkManager::sendSubmitAnswer(uint32_t questionId, uint8_t selectedOptio
     sendMessage(MessageType::C2S_SUBMIT_ANSWER_REQ, ProtocolHelper::packStruct(req));
 }
 
+void NetworkManager::sendReturnToRoom() {
+    sendMessage(MessageType::C2S_RETURN_TO_ROOM_REQ, QByteArray());
+}
+
 void NetworkManager::sendGetStats() {
     sendMessage(MessageType::C2S_GET_STATS_REQ, QByteArray());
 }
@@ -300,6 +304,12 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         case MessageType::S2C_GAME_TERMINATED_NOTIF: {
             auto notif = ProtocolHelper::unpackStruct<GameTerminatedNotification>(body);
             emit gameTerminatedNotif(notif.reason);
+            break;
+        }
+        
+        case MessageType::S2C_RETURN_TO_ROOM_RSP: {
+            auto resp = ProtocolHelper::unpackStruct<StatusResponse>(body);
+            emit returnToRoomResponse(resp.code);
             break;
         }
         

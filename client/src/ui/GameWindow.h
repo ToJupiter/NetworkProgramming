@@ -40,6 +40,7 @@ private slots:
     void onOptionCClicked();
     void onOptionDClicked();
     void onQuestionTick();
+    void onReturnedToRoom();
 
 private:
     void setupUiTheme();
@@ -77,4 +78,7 @@ private:
     bool questionActive;
     bool answerSent;
     bool paused;
+
+signals:
+    void returnedToRoom();
 };

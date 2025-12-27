@@ -37,6 +37,7 @@ private slots:
     void onPlayerJoined(const PlayerInfo& player);
     void onPlayerLeft(uint32_t userId);
     void onPlayerReadyChanged(uint32_t userId, bool isReady);
+    void onReturnedToRoom();
 
     // Network error
     void onNetworkError(const QString& error);

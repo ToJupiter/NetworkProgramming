@@ -207,6 +207,10 @@ void RoomWindow::onGameStarted()
     }
 
     gameWindow = new GameWindow(currentRoom.game_mode, currentRoom.room_id, hostUserId, cachedPlayers, this);
+    
+    // Connect return-to-room signal
+    connect(gameWindow, &GameWindow::returnedToRoom, this, &RoomWindow::onReturnedToRoom);
+    
     this->hide();
     gameWindow->show();
 }
@@ -412,4 +416,25 @@ void RoomWindow::stopCountdownTimer()
         countdownTimer->stop();
     }
     countdownSecondsRemaining = 0;
+}
+
+void RoomWindow::onReturnedToRoom()
+{
+    // Close game window and show room window again
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+    
+    // Reset local player ready state
+    isLocalPlayerReady = false;
+    ui->btnToggleReady->setText("Mark Ready");
+    
+    // Show this window
+    this->show();
+    this->raise();
+    this->activateWindow();
+    
+    // Restart auto-refresh to sync player list
+    setupAutoRefresh();
 }

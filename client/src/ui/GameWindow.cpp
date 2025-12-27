@@ -110,6 +110,12 @@ void GameWindow::bindSignals() {
             this, &GameWindow::onGameTerminated);
     connect(networkManager, &NetworkManager::connectionError,
             this, &GameWindow::onConnectionError);
+    connect(networkManager, &NetworkManager::returnToRoomResponse,
+            this, [this](StatusCode code) {
+                if (code == StatusCode::SUCCESS) {
+                    emit returnedToRoom();
+                }
+            });
 }
 
 void GameWindow::setButtonsEnabled(bool enabled) {
@@ -296,8 +302,8 @@ void GameWindow::onGameOver(uint8_t rankingCount, const QVector<PlayerFinalResul
     
     QMessageBox::information(this, "Game Over", text);
 
-    sessionState->setCurrentRoomId(0);
-    close();
+    // Send return to room request instead of closing
+    networkManager->sendReturnToRoom();
 }
 
 void GameWindow::onGamePaused() {

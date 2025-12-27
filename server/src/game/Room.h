@@ -41,6 +41,7 @@ public:
     void removePlayer(uint32_t userId);
     bool setPlayerReady(uint32_t userId, bool ready);
     void handleStartGame(uint32_t userId);
+    void handleReturnToRoom(uint32_t userId);
 
     // Main gameplay (submit answer, auto-update state on server)
     void handleSubmitAnswer(uint32_t userId, const SubmitAnswerRequest& req);

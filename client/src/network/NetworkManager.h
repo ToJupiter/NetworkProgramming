@@ -26,6 +26,7 @@ public:
     void sendReadyStatus(bool ready);
     void sendStartGame();
     void sendSubmitAnswer(uint32_t questionId, uint8_t selectedOption, uint32_t responseTimeMs);
+    void sendReturnToRoom();
     void sendGetStats();
     void sendPauseGame();
     void sendResumeGame();
@@ -59,6 +60,7 @@ signals:
     void gameResumedNotif();
     void gameTerminatedNotif(TerminationReason reason);
     
+    void returnToRoomResponse(StatusCode code);
     void statsResponse(const UserStatsResponse& stats);
     void errorResponse(StatusCode code, const QString& message);
     
