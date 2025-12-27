@@ -283,7 +283,7 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
             for (int i = 0; i < notif.result_count; ++i) {
                 rankings.append(notif.results[i]);
             }
-            emit gameOverNotif(notif.result_count, rankings);
+            emit gameOverNotif(notif.result_count, rankings, (uint8_t)notif.end_reason, notif.winner_count);
             break;
         }
         

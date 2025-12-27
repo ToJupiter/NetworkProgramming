@@ -949,9 +949,115 @@ struct GameOverNotification {
 
 ---
 
+## 🎯 Phase 5.1: Draw & No Winner Logic (Updated)
+
+**Status**: ✅ **IMPLEMENTED** | **Files Modified**: 4 | **New Enums**: 1
+
+### Overview
+
+Enhanced game end detection to properly handle three scenarios:
+1. **Single Winner**: One player has highest score
+2. **Draw**: Multiple players tied for highest score  
+3. **No Winner (Wipeout)**: All remaining players answer last question wrong
+
+### Protocol Changes (protocol.h)
+
+```cpp
+// ✅ New enum to track game ending type
+enum class GameEndReason : uint8_t {
+    SINGLE_WINNER = 0,      // One clear winner
+    DRAW = 1,               // Multiple players tied for highest score
+    NO_WINNER_WIPEOUT = 2   // All remaining answered wrong
+};
+
+// ✅ Updated PlayerFinalResult with winner flag
+struct PlayerFinalResult {
+    uint32_t user_id;
+    char display_name[MAX_DISPLAY_NAME_LEN];
+    uint32_t final_rank;
+    uint32_t final_score;
+    bool is_winner;  // ✅ NEW: True if this player is a winner (for draws)
+};
+
+// ✅ Updated GameOverNotification with end reason
+struct GameOverNotification {
+    uint8_t result_count;
+    PlayerFinalResult results[MAX_PLAYERS_PER_ROOM];
+    GameEndReason end_reason;  // ✅ NEW: How game ended (0, 1, or 2)
+    uint8_t winner_count;      // ✅ NEW: Number of winners (for draws)
+};
+```
+
+### Server Logic (Room.cpp)
+
+**Key Algorithm in `finishGame()`**:
+
+```cpp
+1. Sort all players (non-eliminated first, then by score descending)
+
+2. Count active (non-eliminated) players
+   → if activePlayers == 0: NO_WINNER_WIPEOUT
+
+3. Find max_score among active players
+
+4. Count how many active players have max_score
+   → winnersCount == 1: SINGLE_WINNER
+   → winnersCount > 1: DRAW
+
+5. Set is_winner flag on all players with max_score
+
+6. Log and broadcast GameOverNotification with end_reason
+```
+
+**Example Scenarios**:
+
+| Scenario | Player1 | Player2 | Result |
+|----------|---------|---------|--------|
+| Both correct Q5 | 500pts | 500pts | **DRAW** (2 winners) |
+| P1 correct, P2 wrong | 500pts | 400pts | **SINGLE_WINNER** (P1) |
+| Both wrong Q5 | Elim | Elim | **NO_WINNER_WIPEOUT** (0 winners) |
+
+### Client Updates (GameWindow.cpp)
+
+**Updated `onGameOver()` signature**:
+```cpp
+void onGameOver(uint8_t rankingCount, 
+                const QVector<PlayerFinalResult>& rankings,
+                uint8_t gameEndReason,      // ✅ 0, 1, or 2
+                uint8_t winnerCount);       // ✅ Number of winners
+```
+
+**Message Logic**:
+```cpp
+case 2 (NO_WINNER_WIPEOUT):
+    "Game Over! No Winner - Everyone answered the last question incorrectly!"
+
+case 1 (DRAW):
+    "Game Over! It's a Draw!\nWinners: Player1, Player2"
+    (lists all players with is_winner == true)
+
+case 0 (SINGLE_WINNER):
+    "Game Over! Winner: Player1"
+```
+
+### Test Cases
+
+✅ **Test 1**: Two players, both answer Q1-Q5 correctly (500 points each)
+- Expected: "Game Over! It's a Draw! Winners: Player1, Player2"
+
+✅ **Test 2**: Two players, P1 answers all correct (500), P2 answers Q5 wrong (400)
+- Expected: "Game Over! Winner: Player1"
+
+✅ **Test 3**: Two players reach Q5, both answer wrong
+- Expected: "Game Over! No Winner - Everyone answered the last question incorrectly!"
+
+---
+
+---
+
 ## 📊 Summary
 
-**Phase 5: Complete**
+**Phase 5: Complete** ✅
 - ✅ 3 new files created (770 lines)
 - ✅ 2 files modified (19 lines)
 - ✅ Full Kahoot-style gameplay
@@ -961,6 +1067,14 @@ struct GameOverNotification {
 - ✅ Game over with winner announcement
 - ✅ Complete network integration
 - ✅ Comprehensive testing procedures documented
+
+**Phase 5.1: Draw & No Winner** ✅ (Bonus Update)
+- ✅ 4 files modified (protocol + Room + GameWindow)
+- ✅ Draw scenario support (multiple winners)
+- ✅ No Winner wipeout detection
+- ✅ Enhanced game end reason enum
+- ✅ Client UI handles all 3 end scenarios
+- ✅ Server correctly identifies tied winners
 
 **Ready for**: Testing → Phase 6 Development (Optional Enhancements)
 
@@ -1039,10 +1153,10 @@ if (isCorrect) {
 
 ---
 
-**Status**: ✅ **PHASE 5 COMPLETE**
+**Status**: ✅ **PHASE 5 + BONUS PHASE 5.1 COMPLETE**
 **Branch**: `client/phase-5`
 **Date**: December 2025
-**Game Modes**: Elimination & Scoring
+**Game Modes**: Elimination & Scoring (with Draw detection)
 **Style**: Kahoot-inspired
 
 🎮 **Ready for gameplay testing and optional Phase 6 enhancements!**

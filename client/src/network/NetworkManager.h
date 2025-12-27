@@ -53,7 +53,8 @@ signals:
                       const QStringList& options, uint32_t timeLimitSec);
     void roundResultNotif(uint8_t correctOption, uint8_t playerCount, const QVector<PlayerRoundResult>& results);
     void playerEliminatedNotif(uint32_t userId);
-    void gameOverNotif(uint8_t rankingCount, const QVector<PlayerFinalResult>& rankings);
+    void gameOverNotif(uint8_t rankingCount, const QVector<PlayerFinalResult>& rankings, 
+                      uint8_t gameEndReason, uint8_t winnerCount);
     void gamePausedNotif();
     void gameResumedNotif();
     void gameTerminatedNotif(TerminationReason reason);

@@ -365,6 +365,37 @@ void Room::finishGame() {
 
     GameOverNotification notif;
     notif.result_count = 0;
+    notif.winner_count = 0;
+    notif.end_reason = GameEndReason::SINGLE_WINNER;
+
+    // Check for draw: multiple players with same highest score and not eliminated
+    int activePlayers = 0;
+    uint32_t maxScore = 0;
+    for (const auto* p : sortedPlayers) {
+        if (!p->isEliminated) {
+            activePlayers++;
+            if (activePlayers == 1) maxScore = p->score;
+        }
+    }
+
+    // Count how many non-eliminated players have the max score (draw condition)
+    int winnersCount = 0;
+    if (activePlayers > 0) {
+        for (const auto* p : sortedPlayers) {
+            if (!p->isEliminated && p->score == maxScore) {
+                winnersCount++;
+            }
+        }
+    } else {
+        // No winner - everyone eliminated (wipeout scenario)
+        notif.end_reason = GameEndReason::NO_WINNER_WIPEOUT;
+    }
+
+    // Set end reason: draw if multiple winners, single winner if one, wipeout if none
+    if (notif.end_reason != GameEndReason::NO_WINNER_WIPEOUT) {
+        notif.end_reason = (winnersCount > 1) ? GameEndReason::DRAW : GameEndReason::SINGLE_WINNER;
+    }
+    notif.winner_count = winnersCount;
 
     std::vector<UserRepository::RankUpdateInfo> eloUpdates;
 
@@ -374,9 +405,19 @@ void Room::finishGame() {
         std::strncpy(res.display_name, sortedPlayers[i]->session->getDisplayName().c_str(), MAX_DISPLAY_NAME_LEN - 1);
         res.final_rank = static_cast<uint32_t>(i + 1);
         res.final_score = sortedPlayers[i]->score;
+        
+        // Mark as winner if in draw/single winner scenario
+        if (!sortedPlayers[i]->isEliminated && sortedPlayers[i]->score == maxScore) {
+            res.is_winner = true;
+        } else {
+            res.is_winner = false;
+        }
 
         eloUpdates.push_back({res.user_id, res.final_rank, res.final_score});
     }
+
+    std::cout << "[Room " << roomId << "] Game Over: end_reason=" << (int)notif.end_reason 
+              << " winners=" << (int)notif.winner_count << std::endl;
 
     broadcast(MessageType::S2C_GAME_OVER_NOTIF, &notif, sizeof(notif));
 

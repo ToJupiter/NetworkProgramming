@@ -263,14 +263,33 @@ void GameWindow::onPlayerEliminated(uint32_t userId) {
     updateScoreboard();
 }
 
-void GameWindow::onGameOver(uint8_t rankingCount, const QVector<PlayerFinalResult>& rankings) {
+void GameWindow::onGameOver(uint8_t rankingCount, const QVector<PlayerFinalResult>& rankings, 
+                            uint8_t gameEndReason, uint8_t winnerCount) {
     stopQuestionTimer();
     setButtonsEnabled(false);
     questionActive = false;
 
-    QString winner = rankingCount > 0 ? QString::fromLatin1(rankings[0].display_name, MAX_DISPLAY_NAME_LEN) : "";
-    QString text = QString("Game over!%1")
-        .arg(winner.isEmpty() ? QString() : QString(" Winner: %1").arg(winner));
+    QString text;
+    
+    // 0 = SINGLE_WINNER, 1 = DRAW, 2 = NO_WINNER_WIPEOUT
+    if (gameEndReason == 2) {
+        // No Winner - Everyone eliminated
+        text = "Game Over! No Winner - Everyone answered the last question incorrectly!";
+    } else if (gameEndReason == 1) {
+        // Draw - Multiple winners
+        QStringList winners;
+        for (const auto& p : rankings) {
+            if (p.is_winner) {
+                winners.append(QString::fromLatin1(p.display_name, MAX_DISPLAY_NAME_LEN));
+            }
+        }
+        text = QString("Game Over! It's a Draw!\nWinners: %1").arg(winners.join(", "));
+    } else {
+        // Single Winner
+        QString winner = rankingCount > 0 ? QString::fromLatin1(rankings[0].display_name, MAX_DISPLAY_NAME_LEN) : "";
+        text = QString("Game over!%1").arg(winner.isEmpty() ? QString() : QString(" Winner: %1").arg(winner));
+    }
+    
     QMessageBox::information(this, "Game Over", text);
 
     sessionState->setCurrentRoomId(0);

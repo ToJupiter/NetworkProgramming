@@ -28,7 +28,8 @@ private slots:
     void onRoundResult(uint8_t correctOption, uint8_t playerCount,
                        const QVector<PlayerRoundResult>& results);
     void onPlayerEliminated(uint32_t userId);
-    void onGameOver(uint8_t rankingCount, const QVector<PlayerFinalResult>& rankings);
+    void onGameOver(uint8_t rankingCount, const QVector<PlayerFinalResult>& rankings, 
+                   uint8_t gameEndReason, uint8_t winnerCount);
     void onGamePaused();
     void onGameResumed();
     void onGameTerminated(TerminationReason reason);
