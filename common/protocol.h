@@ -213,20 +213,20 @@ struct PlayerFinalResult {
     char display_name[MAX_DISPLAY_NAME_LEN];
     uint32_t final_rank;
     uint32_t final_score;
-    bool is_winner;  // ✅ Flag to indicate if this player is a winner (for draws)
+    bool is_winner;
 };
 
 enum class GameEndReason : uint8_t {
-    SINGLE_WINNER,      // One clear winner
-    DRAW,               // Multiple players tied for highest score
-    NO_WINNER_WIPEOUT   // All remaining players answered last question wrong
+    SINGLE_WINNER,
+    DRAW,
+    NO_WINNER_WIPEOUT
 };
 
 struct GameOverNotification {
     uint8_t result_count;
     PlayerFinalResult results[MAX_PLAYERS_PER_ROOM];
-    GameEndReason end_reason;  // ✅ Indicates how the game ended
-    uint8_t winner_count;      // ✅ Number of winners (for draw situations)
+    GameEndReason end_reason;
+    uint8_t winner_count;
 };
 
 struct UserModeStats {

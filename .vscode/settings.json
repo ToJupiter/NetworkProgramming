@@ -87,7 +87,7 @@
         "valarray": "cpp",
         "variant": "cpp"
     },
-    "cmake.sourceDirectory": "/mnt/c/Users/Admin/NetworkProgramming/client",
+    "cmake.sourceDirectory": "/home/rocminfo/Templates/NetworkProgramming/client",
     "C_Cpp.default.includePath": [
         "/usr/include/x86_64-linux-gnu/qt5",
         "/usr/include/x86_64-linux-gnu/qt5/QtCore",
