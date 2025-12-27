@@ -4,6 +4,7 @@
 #include "../models/SessionState.h"
 
 #include <QMessageBox>
+#include <QDebug>
 #include <QTableWidgetItem>
 #include <QHeaderView>
 #include <QPalette>
@@ -179,6 +180,9 @@ void GameWindow::handleAnswerSelection(int optionIndex) {
     setButtonsEnabled(false);
 
     // optionIndex is 1-based for protocol compatibility
+    qDebug().nospace() << "Player " << sessionState->getUserId()
+                       << " selected answer " << optionIndex
+                       << " for Question " << currentQuestionId;
     uint32_t elapsedMs = static_cast<uint32_t>(answerElapsed.elapsed());
     networkManager->sendSubmitAnswer(currentQuestionId, static_cast<uint8_t>(optionIndex), elapsedMs);
 
@@ -218,7 +222,7 @@ void GameWindow::highlightCorrect(uint8_t correctOption) {
     for (int i = 0; i < 4; ++i) {
         QString base = buttons[i]->styleSheet();
         if (i == static_cast<int>(correctOption) - 1) {
-            buttons[i]->setStyleSheet(base + "border: 3px solid #27ae60; box-shadow: none;");
+            buttons[i]->setStyleSheet(base + "border: 3px solid #27ae60;");
         } else if (answerSent && i != static_cast<int>(correctOption) - 1) {
             buttons[i]->setStyleSheet(base + "opacity: 0.6;");
         }
