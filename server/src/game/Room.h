@@ -39,6 +39,9 @@ public:
     
     bool addPlayer(ClientSession* session);
     void removePlayer(uint32_t userId);
+    bool removePlayerAndUpdate(uint32_t userId);
+    void sendPlayerListUpdate();
+    void broadcastRoomClosed();
     bool setPlayerReady(uint32_t userId, bool ready);
     void handleStartGame(uint32_t userId);
     void handleReturnToRoom(uint32_t userId);

@@ -60,6 +60,9 @@ signals:
     void gameResumedNotif();
     void gameTerminatedNotif(TerminationReason reason);
     
+    void leaveRoomResponse(StatusCode code);
+    void playerListUpdate(uint8_t playerCount, const QVector<PlayerInfo>& players, uint32_t hostUserId);
+    void roomClosedNotif(uint32_t roomId);
     void returnToRoomResponse(StatusCode code);
     void statsResponse(const UserStatsResponse& stats);
     void errorResponse(StatusCode code, const QString& message);

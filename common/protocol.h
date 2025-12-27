@@ -42,6 +42,9 @@ enum class MessageType : uint16_t {
     C2S_LEAVE_MATCH_REQ,
     C2S_RETURN_TO_ROOM_REQ,
     S2C_RETURN_TO_ROOM_RSP,
+    S2C_LEAVE_ROOM_RSP,
+    S2C_PLAYER_LIST_UPDATE,
+    S2C_ROOM_CLOSED_NOTIF,
 
     C2S_GET_STATS_REQ,
     S2C_GET_STATS_RSP,
@@ -145,6 +148,16 @@ struct PlayerInfo {
     uint32_t user_id;
     char display_name[MAX_DISPLAY_NAME_LEN];
     bool is_ready;
+};
+
+struct PlayerListUpdate {
+    uint8_t player_count;
+    PlayerInfo players[MAX_PLAYERS_PER_ROOM];
+    uint32_t host_user_id;
+};
+
+struct RoomClosedNotification {
+    uint32_t room_id;
 };
 
 struct JoinRoomResponse {

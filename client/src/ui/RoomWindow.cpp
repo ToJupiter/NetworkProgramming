@@ -115,6 +115,12 @@ void RoomWindow::setupConnections()
             this, &RoomWindow::onPlayerJoined);
     connect(networkManager, &NetworkManager::playerLeftNotif,
             this, &RoomWindow::onPlayerLeft);
+        connect(networkManager, &NetworkManager::playerListUpdate,
+            this, &RoomWindow::onPlayerListUpdate);
+        connect(networkManager, &NetworkManager::leaveRoomResponse,
+            this, &RoomWindow::onLeaveRoomResponse);
+        connect(networkManager, &NetworkManager::roomClosedNotif,
+            this, &RoomWindow::onRoomClosed);
     
     // Network error
     connect(networkManager, &NetworkManager::connectionError,
@@ -186,7 +192,8 @@ void RoomWindow::onLeaveRoomClicked()
 
     if (reply == QMessageBox::Yes) {
         networkManager->sendLeaveRoom();
-        this->close();
+        ui->btnLeaveRoom->setEnabled(false);
+        ui->lblError->setText("Leaving room...");
     }
 }
 
@@ -437,4 +444,50 @@ void RoomWindow::onReturnedToRoom()
     
     // Restart auto-refresh to sync player list
     setupAutoRefresh();
+}
+
+void RoomWindow::onPlayerListUpdate(uint8_t /*playerCount*/, const QVector<PlayerInfo>& players, uint32_t hostId)
+{
+    cachedPlayers = players;
+    hostUserId = hostId;
+    populatePlayerTable(players);
+    enableStartGameButton();
+}
+
+void RoomWindow::onLeaveRoomResponse(StatusCode code)
+{
+    if (code == StatusCode::SUCCESS) {
+        SessionState::instance().setCurrentRoomId(0);
+        if (gameWindow) {
+            gameWindow->close();
+            gameWindow = nullptr;
+        }
+        this->hide();
+        if (parentWidget()) {
+            parentWidget()->show();
+            parentWidget()->raise();
+            parentWidget()->activateWindow();
+        }
+        ui->btnLeaveRoom->setEnabled(true);
+    } else {
+        ui->lblError->setText("Failed to leave room.");
+        ui->btnLeaveRoom->setEnabled(true);
+    }
+}
+
+void RoomWindow::onRoomClosed(uint32_t /*roomId*/)
+{
+    QMessageBox::information(this, "Room Closed", "Room closed by Host");
+    SessionState::instance().setCurrentRoomId(0);
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+    this->hide();
+    if (parentWidget()) {
+        parentWidget()->show();
+        parentWidget()->raise();
+        parentWidget()->activateWindow();
+    }
+    ui->btnLeaveRoom->setEnabled(true);
 }

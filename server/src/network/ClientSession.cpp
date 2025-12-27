@@ -251,10 +251,14 @@ void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
 
 void ClientSession::handleLeaveRoom() {
     if (state.currentRoomId == 0) return;
-    
+
     server->getRoomManager()->leaveRoom(state.currentRoomId, state.userId);
+
+    StatusResponse rsp{};
+    rsp.code = StatusCode::SUCCESS;
+    sendResponse(MessageType::S2C_LEAVE_ROOM_RSP, &rsp, sizeof(rsp));
+
     state.currentRoomId = 0;
-    
 }
 
 void ClientSession::handleReadyStatus(const ReadyStatusRequest* req) {

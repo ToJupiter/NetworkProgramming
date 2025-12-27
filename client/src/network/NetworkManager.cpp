@@ -307,6 +307,28 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
             break;
         }
         
+        case MessageType::S2C_LEAVE_ROOM_RSP: {
+            auto resp = ProtocolHelper::unpackStruct<StatusResponse>(body);
+            emit leaveRoomResponse(resp.code);
+            break;
+        }
+
+        case MessageType::S2C_PLAYER_LIST_UPDATE: {
+            auto upd = ProtocolHelper::unpackStruct<PlayerListUpdate>(body);
+            QVector<PlayerInfo> players;
+            for (int i = 0; i < upd.player_count; ++i) {
+                players.append(upd.players[i]);
+            }
+            emit playerListUpdate(upd.player_count, players, upd.host_user_id);
+            break;
+        }
+
+        case MessageType::S2C_ROOM_CLOSED_NOTIF: {
+            auto notif = ProtocolHelper::unpackStruct<RoomClosedNotification>(body);
+            emit roomClosedNotif(notif.room_id);
+            break;
+        }
+        
         case MessageType::S2C_RETURN_TO_ROOM_RSP: {
             auto resp = ProtocolHelper::unpackStruct<StatusResponse>(body);
             emit returnToRoomResponse(resp.code);

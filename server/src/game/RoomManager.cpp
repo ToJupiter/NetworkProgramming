@@ -39,19 +39,29 @@ void RoomManager::removeRoom(uint32_t roomId) {
 }
 
 bool RoomManager::leaveRoom(uint32_t roomId, uint32_t userId) {
-    bool isEmpty = false;
+    Room* room = nullptr;
     {
         std::lock_guard<std::mutex> lock(managerMutex);
         auto it = activeRooms.find(roomId);
         if (it != activeRooms.end()) {
-            it->second->removePlayer(userId);
-            isEmpty = it->second->isEmpty();
+            room = it->second.get();
         }
     }
-    if (isEmpty) {
+
+    if (!room) return false;
+
+    // Host leaving -> close room for everyone
+    if (room->getHostId() == userId) {
+        room->broadcastRoomClosed();
+        removeRoom(roomId);
+        return true;
+    }
+
+    bool emptyAfter = room->removePlayerAndUpdate(userId);
+    if (emptyAfter) {
         removeRoom(roomId);
     }
-    return isEmpty;
+    return emptyAfter;
 }
 
 void RoomManager::updateAllRooms() {
