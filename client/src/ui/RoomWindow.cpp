@@ -91,6 +91,14 @@ void RoomWindow::setupConnections()
     // For game start notifications
     connect(networkManager, &NetworkManager::gameStartNotif,
             this, &RoomWindow::onGameStarted);
+
+    // Fallback: if a question arrives but we are still in the room view, transition to game
+    connect(networkManager, &NetworkManager::questionNotif,
+            this, [this](uint32_t /*qid*/, const QString& /*content*/, const QStringList& /*opts*/, uint32_t /*tl*/) {
+                if (!gameWindow) {
+                    onGameStarted();
+                }
+            });
     
     // For player notifications
     connect(networkManager, &NetworkManager::playerJoinedNotif,

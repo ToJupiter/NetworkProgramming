@@ -59,6 +59,8 @@ GameWindow::GameWindow(GameMode mode, uint32_t roomId, uint32_t hostUserId,
     ui->lblFeedback->setText("Waiting for game start...");
 
     // Scoreboard setup
+    ui->tblScoreboard->setColumnCount(4);
+    ui->tblScoreboard->setHorizontalHeaderLabels({"Rank", "Player", "Score", "Status"});
     ui->tblScoreboard->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui->tblScoreboard->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->tblScoreboard->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -313,23 +315,49 @@ void GameWindow::onConnectionError(const QString& error) {
 }
 
 void GameWindow::updateScoreboard() {
+    // Sort players by score descending, non-eliminated first
+    QVector<ClientPlayer> sorted = players;
+    std::sort(sorted.begin(), sorted.end(), [](const ClientPlayer& a, const ClientPlayer& b) {
+        if (a.is_eliminated != b.is_eliminated) return !a.is_eliminated && b.is_eliminated;
+        return a.score > b.score;
+    });
+
     ui->tblScoreboard->setRowCount(0);
-    for (int i = 0; i < players.size(); ++i) {
-        const auto& p = players[i];
+    for (int i = 0; i < sorted.size(); ++i) {
+        const auto& p = sorted[i];
         int row = ui->tblScoreboard->rowCount();
         ui->tblScoreboard->insertRow(row);
 
+        auto *rankItem = new QTableWidgetItem(QString::number(i + 1));
         auto *nameItem = new QTableWidgetItem(p.display_name);
         auto *scoreItem = new QTableWidgetItem(QString::number(p.score));
         auto *statusItem = new QTableWidgetItem(formatStatus(p));
 
+        rankItem->setFlags(rankItem->flags() & ~Qt::ItemIsEditable);
         nameItem->setFlags(nameItem->flags() & ~Qt::ItemIsEditable);
         scoreItem->setFlags(scoreItem->flags() & ~Qt::ItemIsEditable);
         statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
 
-        ui->tblScoreboard->setItem(row, 0, nameItem);
-        ui->tblScoreboard->setItem(row, 1, scoreItem);
-        ui->tblScoreboard->setItem(row, 2, statusItem);
+        // Highlight current user for clarity (bold + subtle background)
+        if (p.user_id == sessionState->getUserId()) {
+            QFont bold;
+            bold.setBold(true);
+            rankItem->setFont(bold);
+            nameItem->setFont(bold);
+            scoreItem->setFont(bold);
+            statusItem->setFont(bold);
+
+            QColor bg(230, 240, 255); // soft blue tint
+            rankItem->setBackground(QBrush(bg));
+            nameItem->setBackground(QBrush(bg));
+            scoreItem->setBackground(QBrush(bg));
+            statusItem->setBackground(QBrush(bg));
+        }
+
+        ui->tblScoreboard->setItem(row, 0, rankItem);
+        ui->tblScoreboard->setItem(row, 1, nameItem);
+        ui->tblScoreboard->setItem(row, 2, scoreItem);
+        ui->tblScoreboard->setItem(row, 3, statusItem);
     }
 }
 
