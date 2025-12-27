@@ -343,6 +343,10 @@ void GameWindow::onConnectionError(const QString& error) {
     QMessageBox::critical(this, "Connection Error", error);
 }
 
+void GameWindow::onReturnedToRoom() {
+    // No-op: RoomWindow handles closing this window and showing room view
+}
+
 void GameWindow::updateScoreboard() {
     // Sort players by score descending, non-eliminated first
     QVector<ClientPlayer> sorted = players;
