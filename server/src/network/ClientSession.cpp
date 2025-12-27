@@ -172,6 +172,12 @@ void ClientSession::handleCreateRoom(const CreateRoomRequest* req){
         rsp.code = StatusCode::SUCCESS;
         rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_CREATE_ROOM_RSP, &rsp, sizeof(rsp));
+        
+        // Send host the full player list after room creation
+        JoinRoomResponse playerListRsp{};
+        room->getPlayerList(playerListRsp);
+        sendMsg(MessageType::S2C_JOIN_ROOM_RSP, &playerListRsp, sizeof(playerListRsp));
+        writeData(); // Flush immediately for consistency
     }
 }
 

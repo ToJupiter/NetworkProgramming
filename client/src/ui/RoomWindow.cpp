@@ -88,6 +88,16 @@ void RoomWindow::setupConnections()
                 onPlayerReadyChanged(userId, ready);
             });
     
+    // Handle join room response with full player list
+    connect(networkManager, &NetworkManager::joinRoomResponse,
+            this, [this](StatusCode code, const RoomInfo& /*info*/, uint8_t playerCount, 
+                        const QVector<PlayerInfo>& players, uint32_t hostId) {
+                if (code == StatusCode::SUCCESS) {
+                    hostUserId = hostId;
+                    onPlayerListUpdate(playerCount, players);
+                }
+            });
+    
     // For game start notifications
     connect(networkManager, &NetworkManager::gameStartNotif,
             this, &RoomWindow::onGameStarted);
@@ -313,6 +323,7 @@ void RoomWindow::onRefreshPlayerList()
 void RoomWindow::populatePlayerTable(const QVector<PlayerInfo>& players)
 {
     ui->tblPlayers->setRowCount(0);
+    uint32_t localUserId = sessionState->getUserId();
 
     for (const auto& player : players) {
         int rowCount = ui->tblPlayers->rowCount();
@@ -326,8 +337,8 @@ void RoomWindow::populatePlayerTable(const QVector<PlayerInfo>& players)
         statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
         roleItem->setFlags(roleItem->flags() & ~Qt::ItemIsEditable);
 
-        // Bold for host and local player
-        if (player.user_id == hostUserId || player.user_id == sessionState->getUserId()) {
+        // Bold ONLY for local player
+        if (player.user_id == localUserId) {
             QFont boldFont = nameItem->font();
             boldFont.setBold(true);
             nameItem->setFont(boldFont);

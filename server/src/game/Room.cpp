@@ -204,6 +204,21 @@ void Room::update(uint64_t nowMs) {
     } else if (state == RoomState::IN_GAME_RESULT) {
         if (nowMs >= stateStartTimeMs + RESULT_DISPLAY_MS) {
             currentQuestionIndex++;
+            
+            // Check if game should end due to elimination
+            if (gameMode == GameMode::ELIMINATION) {
+                int activePlayers = 0;
+                for (const auto& p : participants) {
+                    if (!p.second.isEliminated) activePlayers++;
+                }
+                
+                // If 0 or 1 players left: Game ends (last survivor wins or no winner)
+                if (activePlayers <= 1) {
+                    finishGame();
+                    return;
+                }
+            }
+            
             if (currentQuestionIndex >= questions.size()) finishGame();
             else nextRound();
         }
