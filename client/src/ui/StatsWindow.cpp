@@ -20,32 +20,55 @@ StatsWindow::~StatsWindow() {
 }
 
 void StatsWindow::showLoading() {
-    ui->lblMatchesValue->setText("Loading...");
-    ui->lblWinsValue->setText("-");
-    ui->lblWinRateValue->setText("-");
-    ui->lblCorrectValue->setText("-");
-    ui->lblIncorrectValue->setText("-");
-    ui->lblAccuracyValue->setText("-");
-    ui->lblAverageScoreValue->setText("-");
+    const auto resetMode = [](QLabel* matches, QLabel* wins, QLabel* winRate,
+                               QLabel* correct, QLabel* incorrect, QLabel* avgOrHigh = nullptr,
+                               QLabel* highScore = nullptr) {
+        matches->setText("Loading...");
+        wins->setText("-");
+        winRate->setText("-");
+        correct->setText("-");
+        incorrect->setText("-");
+        if (avgOrHigh) avgOrHigh->setText("-");
+        if (highScore) highScore->setText("-");
+    };
+
+    resetMode(ui->lblElimMatchesValue, ui->lblElimWinsValue, ui->lblElimWinRateValue,
+              ui->lblElimCorrectValue, ui->lblElimIncorrectValue);
+
+    resetMode(ui->lblScoreMatchesValue, ui->lblScoreWinsValue, ui->lblScoreWinRateValue,
+              ui->lblScoreCorrectValue, ui->lblScoreIncorrectValue,
+              ui->lblScoreAverageValue, ui->lblScoreHighValue);
+
     ui->lblRankedPointsValue->setText("-");
 }
 
 void StatsWindow::setStats(const UserStatsResponse &stats) {
-    const uint32_t matches = stats.total_matches;
-    const uint32_t wins = stats.wins;
-    const uint32_t correct = stats.total_correct_answers;
-    const uint32_t incorrect = stats.total_incorrect_answers;
-    const double totalAnswered = static_cast<double>(correct + incorrect);
+    auto updateMode = [](const UserModeStats& mode, QLabel* matches, QLabel* wins,
+                         QLabel* winRate, QLabel* correct, QLabel* incorrect,
+                         QLabel* averageScore = nullptr, QLabel* highScore = nullptr) {
+        const double rate = (mode.total_matches == 0)
+                                ? 0.0
+                                : (static_cast<double>(mode.wins) * 100.0 / mode.total_matches);
 
-    const double winRate = (matches == 0) ? 0.0 : (static_cast<double>(wins) * 100.0 / matches);
-    const double accuracy = (totalAnswered == 0.0) ? 0.0 : (static_cast<double>(correct) * 100.0 / totalAnswered);
+        matches->setText(QString::number(mode.total_matches));
+        wins->setText(QString::number(mode.wins));
+        winRate->setText(formatPercent(rate));
+        correct->setText(QString::number(mode.total_correct_answers));
+        incorrect->setText(QString::number(mode.total_incorrect_answers));
+        if (averageScore) {
+            averageScore->setText(QString::number(mode.average_score, 'f', 1));
+        }
+        if (highScore) {
+            highScore->setText(QString::number(mode.high_score));
+        }
+    };
 
-    ui->lblMatchesValue->setText(QString::number(matches));
-    ui->lblWinsValue->setText(QString::number(wins));
-    ui->lblWinRateValue->setText(formatPercent(winRate));
-    ui->lblCorrectValue->setText(QString::number(correct));
-    ui->lblIncorrectValue->setText(QString::number(incorrect));
-    ui->lblAccuracyValue->setText(formatPercent(accuracy));
-    ui->lblAverageScoreValue->setText(QString::number(stats.average_score, 'f', 1));
+    updateMode(stats.elimination, ui->lblElimMatchesValue, ui->lblElimWinsValue,
+               ui->lblElimWinRateValue, ui->lblElimCorrectValue, ui->lblElimIncorrectValue);
+
+    updateMode(stats.scoring, ui->lblScoreMatchesValue, ui->lblScoreWinsValue,
+               ui->lblScoreWinRateValue, ui->lblScoreCorrectValue, ui->lblScoreIncorrectValue,
+               ui->lblScoreAverageValue, ui->lblScoreHighValue);
+
     ui->lblRankedPointsValue->setText(QString::number(stats.ranked_points));
 }

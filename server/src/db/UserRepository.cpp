@@ -1,38 +1,64 @@
 #include "UserRepository.h"
 #include "DatabaseManager.h"
 #include <bits/stdc++.h>
+#include <algorithm>
 
 UserStatsResponse UserRepository::getUserStats(uint32_t userId) {
-    UserStatsResponse stats = {0, 0, 0, 0, 0.0, 1000};
+    UserStatsResponse stats{};
+    // Default ranked points if no record found
+    stats.ranked_points = 1000;
+
+    auto fillModeStats = [&](const std::string& mode, UserModeStats& out) {
+        out.total_matches = 0;
+        out.wins = 0;
+        out.total_correct_answers = 0;
+        out.total_incorrect_answers = 0;
+        out.average_score = 0.0;
+        out.high_score = 0;
+
+        auto &db = DatabaseManager::getInstance().getDb();
+
+        db << "SELECT COUNT(*), IFNULL(SUM(CASE WHEN rank = 1 THEN 1 ELSE 0 END), 0) "
+              "FROM session_participants sp "
+              "JOIN game_sessions gs ON sp.session_id = gs.id "
+              "WHERE sp.user_id = ? AND gs.game_mode = ?"
+           << userId << mode
+           >> [&](int total, int wins) {
+                out.total_matches = total;
+                out.wins = wins;
+           };
+
+        db << "SELECT IFNULL(AVG(sp.score), 0), IFNULL(MAX(sp.score), 0) "
+              "FROM session_participants sp "
+              "JOIN game_sessions gs ON sp.session_id = gs.id "
+              "WHERE sp.user_id = ? AND gs.game_mode = ?"
+           << userId << mode
+           >> [&](double avg, int maxScore) {
+                out.average_score = avg;
+                out.high_score = static_cast<uint32_t>(std::max(0, maxScore));
+           };
+
+        db << "SELECT IFNULL(SUM(CASE WHEN gl.is_correct = 1 THEN 1 ELSE 0 END), 0), "
+              "       IFNULL(SUM(CASE WHEN gl.is_correct = 0 THEN 1 ELSE 0 END), 0) "
+              "FROM game_log gl "
+              "JOIN game_sessions gs ON gl.session_id = gs.id "
+              "WHERE gl.user_id = ? AND gs.game_mode = ?"
+           << userId << mode
+           >> [&](int correct, int incorrect) {
+                out.total_correct_answers = correct;
+                out.total_incorrect_answers = incorrect;
+           };
+    };
+
     try {
         auto &db = DatabaseManager::getInstance().getDb();
 
         db << "SELECT ranked_points FROM users WHERE id = ?"
            << userId
            >> stats.ranked_points;
-        
-        db << "SELECT COUNT(*), SUM(CASE WHEN rank = 1 THEN 1 ELSE 0 END) "
-              "FROM session_participants WHERE user_id = ?"
-           << userId
-           >> [&](int total, int wins) {
-                stats.total_matches = total;
-                stats.wins = wins;
-           };
 
-        db << "SELECT AVG(score) FROM session_participants WHERE user_id = ?"
-           << userId
-           >> [&](double avg) {
-                stats.average_score = avg;
-           };
-        
-        db << "SELECT SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END), "
-              "       SUM(CASE WHEN is_correct = 0 THEN 1 ELSE 0 END)"
-              "FROM game_log WHERE user_id = ?"
-            << userId
-            >> [&](int correct, int incorrect) {
-                stats.total_correct_answers = correct;
-                stats.total_incorrect_answers = incorrect;
-            };
+        fillModeStats("Elimination", stats.elimination);
+        fillModeStats("Scoring", stats.scoring);
     } catch (const std::exception &e) {
         std::cerr << "DB Error getting stats: " << e.what() << std::endl;
     }

@@ -227,12 +227,18 @@ struct GameOverNotification {
     uint8_t winner_count;      // ✅ Number of winners (for draw situations)
 };
 
-struct UserStatsResponse {
+struct UserModeStats {
     uint32_t total_matches;
     uint32_t wins;
     uint32_t total_correct_answers;
     uint32_t total_incorrect_answers;
     double average_score;
+    uint32_t high_score;
+};
+
+struct UserStatsResponse {
+    UserModeStats elimination;
+    UserModeStats scoring;
     uint32_t ranked_points;
 };
 

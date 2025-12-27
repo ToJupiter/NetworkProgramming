@@ -27,125 +27,222 @@
      </property>
     </widget>
    </item>
-   <item>
-    <layout class="QFormLayout" name="formLayout">
-     <property name="labelAlignment">
+    <item>
+     <layout class="QFormLayout" name="formRanked">
+      <property name="labelAlignment">
       <set>Qt::AlignRight|Qt::AlignVCenter</set>
-     </property>
-     <item row="0" column="0">
-      <widget class="QLabel" name="lblMatches">
-       <property name="text">
-        <string>Total Matches:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QLabel" name="lblMatchesValue">
-       <property name="text">
-        <string>--</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="lblWins">
-       <property name="text">
-        <string>Wins:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="1">
-      <widget class="QLabel" name="lblWinsValue">
-       <property name="text">
-        <string>--</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="lblWinRate">
-       <property name="text">
-        <string>Win Rate:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QLabel" name="lblWinRateValue">
-       <property name="text">
-        <string>--</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="0">
-      <widget class="QLabel" name="lblCorrect">
-       <property name="text">
-        <string>Correct Answers:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="1">
-      <widget class="QLabel" name="lblCorrectValue">
-       <property name="text">
-        <string>--</string>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="0">
-      <widget class="QLabel" name="lblIncorrect">
-       <property name="text">
-        <string>Incorrect Answers:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="1">
-      <widget class="QLabel" name="lblIncorrectValue">
-       <property name="text">
-        <string>--</string>
-       </property>
-      </widget>
-     </item>
-     <item row="5" column="0">
-      <widget class="QLabel" name="lblAccuracy">
-       <property name="text">
-        <string>Accuracy:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="5" column="1">
-      <widget class="QLabel" name="lblAccuracyValue">
-       <property name="text">
-        <string>--</string>
-       </property>
-      </widget>
-     </item>
-     <item row="6" column="0">
-      <widget class="QLabel" name="lblAverageScore">
-       <property name="text">
-        <string>Average Score:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="6" column="1">
-      <widget class="QLabel" name="lblAverageScoreValue">
-       <property name="text">
-        <string>--</string>
-       </property>
-      </widget>
-     </item>
-     <item row="7" column="0">
+      </property>
+      <item row="0" column="0">
       <widget class="QLabel" name="lblRankedPoints">
        <property name="text">
         <string>Ranked Points:</string>
        </property>
       </widget>
-     </item>
-     <item row="7" column="1">
+      </item>
+      <item row="0" column="1">
       <widget class="QLabel" name="lblRankedPointsValue">
        <property name="text">
         <string>--</string>
        </property>
       </widget>
-     </item>
-    </layout>
-   </item>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+        <number>0</number>
+      </property>
+      <widget class="QWidget" name="tabElimination">
+        <attribute name="title">
+         <string>Elimination Mode</string>
+        </attribute>
+        <layout class="QFormLayout" name="formElimination">
+         <property name="labelAlignment">
+          <set>Qt::AlignRight|Qt::AlignVCenter</set>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="lblElimMatches">
+            <property name="text">
+             <string>Total Matches:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLabel" name="lblElimMatchesValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="lblElimWins">
+            <property name="text">
+             <string>Wins:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QLabel" name="lblElimWinsValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="lblElimWinRate">
+            <property name="text">
+             <string>Win Rate:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QLabel" name="lblElimWinRateValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="lblElimCorrect">
+            <property name="text">
+             <string>Correct Answers:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QLabel" name="lblElimCorrectValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="lblElimIncorrect">
+            <property name="text">
+             <string>Incorrect Answers:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QLabel" name="lblElimIncorrectValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+        </layout>
+      </widget>
+      <widget class="QWidget" name="tabScoring">
+        <attribute name="title">
+         <string>Scoring Mode</string>
+        </attribute>
+        <layout class="QFormLayout" name="formScoring">
+         <property name="labelAlignment">
+          <set>Qt::AlignRight|Qt::AlignVCenter</set>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="lblScoreMatches">
+            <property name="text">
+             <string>Total Matches:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLabel" name="lblScoreMatchesValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="lblScoreWins">
+            <property name="text">
+             <string>Wins:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QLabel" name="lblScoreWinsValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="lblScoreWinRate">
+            <property name="text">
+             <string>Win Rate:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QLabel" name="lblScoreWinRateValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="lblScoreHigh">
+            <property name="text">
+             <string>High Score:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QLabel" name="lblScoreHighValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="lblScoreCorrect">
+            <property name="text">
+             <string>Correct Answers:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QLabel" name="lblScoreCorrectValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="5" column="0">
+          <widget class="QLabel" name="lblScoreIncorrect">
+            <property name="text">
+             <string>Incorrect Answers:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="5" column="1">
+          <widget class="QLabel" name="lblScoreIncorrectValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+         <item row="6" column="0">
+          <widget class="QLabel" name="lblScoreAverage">
+            <property name="text">
+             <string>Average Score:</string>
+            </property>
+          </widget>
+         </item>
+         <item row="6" column="1">
+          <widget class="QLabel" name="lblScoreAverageValue">
+            <property name="text">
+             <string>--</string>
+            </property>
+          </widget>
+         </item>
+        </layout>
+      </widget>
+     </widget>
+    </item>
    <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
