@@ -326,6 +326,15 @@ void RoomWindow::populatePlayerTable(const QVector<PlayerInfo>& players)
         statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
         roleItem->setFlags(roleItem->flags() & ~Qt::ItemIsEditable);
 
+        // Bold for host and local player
+        if (player.user_id == hostUserId || player.user_id == sessionState->getUserId()) {
+            QFont boldFont = nameItem->font();
+            boldFont.setBold(true);
+            nameItem->setFont(boldFont);
+            statusItem->setFont(boldFont);
+            roleItem->setFont(boldFont);
+        }
+
         ui->tblPlayers->setItem(rowCount, 0, nameItem);
         ui->tblPlayers->setItem(rowCount, 1, statusItem);
         ui->tblPlayers->setItem(rowCount, 2, roleItem);

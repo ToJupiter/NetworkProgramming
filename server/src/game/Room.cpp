@@ -161,6 +161,8 @@ void Room::broadcast(MessageType type, const void* data, uint32_t len, uint32_t 
     for (auto& pair : participants) {
         if (pair.first != excludeUserId) {
             pair.second.session->sendMsg(type, data, len);
+            // Immediately flush to avoid epoll edge-triggered issues
+            pair.second.session->writeData();
         }
     }
 }
@@ -308,7 +310,7 @@ void Room::calculateScores() {
 
     for (auto& pair: participants) {
         auto& p = pair.second;
-        if (!p.isEliminated) continue;
+        if (p.isEliminated) continue;
 
         bool correct = p.hasAnswered && (p.selectedOption == correctOpt);
 
