@@ -5,6 +5,8 @@
 #include "../models/SessionState.h"
 #include <QMessageBox>
 #include <QRegularExpression>
+#include <QShowEvent>
+#include <QShowEvent>
 
 LoginWindow::LoginWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -152,9 +154,13 @@ void LoginWindow::onConnected() {
 }
 
 void LoginWindow::onDisconnected() {
-    showError("Disconnected from server");
-    ui->btnLogin->setEnabled(false);
-    ui->btnRegister->setEnabled(false);
+    // Only show error if LoginWindow is visible (user is on login screen)
+    // If user is in Lobby and logs out, LobbyWindow handles the transition
+    if (this->isVisible()) {
+        showError("Disconnected from server");
+        ui->btnLogin->setEnabled(false);
+        ui->btnRegister->setEnabled(false);
+    }
 }
 
 void LoginWindow::onConnectionError(const QString& error) {
@@ -210,4 +216,20 @@ void LoginWindow::showError(const QString& message) {
 
 void LoginWindow::clearError() {
     ui->lblError->setText("");
+}
+
+void LoginWindow::showEvent(QShowEvent *event) {
+    QMainWindow::showEvent(event);
+    
+    // If we're being shown again (e.g., after logout), check connection
+    auto& network = NetworkManager::instance();
+    if (!network.isConnected()) {
+        // Reconnect to server
+        connectToServer();
+    } else {
+        // Already connected, just clear error and enable buttons
+        clearError();
+        ui->btnLogin->setEnabled(true);
+        ui->btnRegister->setEnabled(true);
+    }
 }

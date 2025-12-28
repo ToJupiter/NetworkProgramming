@@ -26,6 +26,9 @@ private slots:
     void onRegisterResponse(StatusCode code);
     void onLoginResponse(StatusCode code, uint32_t userId, const QString& displayName);
     
+protected:
+    void showEvent(QShowEvent *event) override;
+    
 private:
     void connectToServer();
     bool validateLoginInput();
