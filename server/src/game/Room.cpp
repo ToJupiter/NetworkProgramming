@@ -449,7 +449,9 @@ void Room::finishGame() {
     std::cout << "[Room " << roomId << "] Game Over: end_reason=" << (int)notif.end_reason 
               << " winners=" << (int)notif.winner_count << std::endl;
 
+    std::cout << "[Room " << roomId << "] Broadcasting GAME_OVER to " << participants.size() << " players..." << std::endl;
     broadcast(MessageType::S2C_GAME_OVER_NOTIF, &notif, sizeof(notif));
+    std::cout << "[Room " << roomId << "] GAME_OVER broadcast complete" << std::endl;
 
     persistResults(sortedPlayers, TerminationReason::UNKNOWN);
     UserRepository::updateUserRanks(eloUpdates);

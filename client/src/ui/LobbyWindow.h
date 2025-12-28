@@ -36,6 +36,7 @@ private slots:
                             uint8_t player_count, const QVector<PlayerInfo>& players, uint32_t host_user_id);
     void onConnectionError(const QString &error);
     void onStatsResponse(const UserStatsResponse& stats);
+    void onDisconnected();
 
     // Timer slot
     void onRefreshTimer();
@@ -58,6 +59,7 @@ private:
     QVector<RoomInfo> cachedRooms;
     int selectedRoomIndex;
     bool joinInProgress;
+    bool intentionalLogout;
 };
 
 #endif // LOBBYWINDOW_H

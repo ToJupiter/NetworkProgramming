@@ -18,6 +18,7 @@ LobbyWindow::LobbyWindow(QWidget *parent)
     , refreshTimer(new QTimer(this))
     , selectedRoomIndex(-1)
     , joinInProgress(false)
+    , intentionalLogout(false)
 {
     ui->setupUi(this);
     setupUI();
@@ -67,7 +68,9 @@ void LobbyWindow::setupConnections() {
             this, &LobbyWindow::onJoinRoomResponse);
         connect(networkManager, &NetworkManager::statsResponse,
             this, &LobbyWindow::onStatsResponse);
-        connect(networkManager, &NetworkManager::connectionError,
+    connect(networkManager, &NetworkManager::disconnected,
+            this, &LobbyWindow::onDisconnected);
+    connect(networkManager, &NetworkManager::connectionError,
             this, &LobbyWindow::onConnectionError);
 
     // Timer
@@ -125,8 +128,16 @@ void LobbyWindow::onLogoutClicked() {
 
     if (ret == QMessageBox::Yes) {
         SessionState::instance().clear();
+        intentionalLogout = true;
+        networkManager->disconnectFromServer();
         this->close();
-        // LoginWindow will be shown by parent logic
+        
+        // Show Login Window
+        if (parentWidget()) {
+            parentWidget()->show();
+            parentWidget()->raise();
+            parentWidget()->activateWindow();
+        }
     }
 }
 
@@ -322,4 +333,19 @@ QString LobbyWindow::formatGameMode(GameMode mode) const {
 
 QString LobbyWindow::formatRoomStatus(bool inGame) const {
     return inGame ? "In Game" : "Waiting";
+}
+void LobbyWindow::onDisconnected() {
+    // Only show error if this wasn't an intentional logout
+    if (!intentionalLogout) {
+        QMessageBox::critical(this, "Connection Lost", 
+            "Disconnected from server. Please login again.");
+        this->close();
+        if (parentWidget()) {
+            parentWidget()->show();
+            parentWidget()->raise();
+            parentWidget()->activateWindow();
+        }
+    }
+    // Reset flag for next time
+    intentionalLogout = false;
 }

@@ -49,6 +49,7 @@ bool RoomManager::leaveRoom(uint32_t roomId, uint32_t userId, bool isHost) {
             if (isHost) {
                 // Host leaves: notify all clients and mark room for removal
                 room->broadcastRoomClosed();
+                room->removePlayer(userId);
                 remove = true;
             } else {
                 // Regular player leaves: remove and notify remaining players

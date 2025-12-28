@@ -96,6 +96,9 @@ void RoomWindow::setupConnections()
                 if (code == StatusCode::SUCCESS) {
                     hostUserId = hostId;
                     onPlayerListUpdate(playerCount, players);
+                    // Clear any previous status messages (e.g., "Leaving room...")
+                    ui->lblError->clear();
+                    ui->btnLeaveRoom->setEnabled(true);
                 }
             });
     
