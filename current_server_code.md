@@ -1,7 +1,69 @@
 # Source Code Collection
 
-## server/CMakeLists.txt
-``` txt
+## database_init.sql
+``` sql
+-- schema.sql
+
+-- Table to store user account information
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    display_name TEXT NOT NULL,
+    hashed_password TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ranked_points INTEGER DEFAULT 1000
+);
+
+-- Table to store all quiz questions
+CREATE TABLE IF NOT EXISTS questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT NOT NULL,
+    option1 TEXT NOT NULL,
+    option2 TEXT NOT NULL,
+    option3 TEXT NOT NULL,
+    option4 TEXT NOT NULL,
+    correct_option INTEGER NOT NULL, -- 1, 2, 3, or 4
+    difficulty INTEGER DEFAULT 1 -- e.g., 1 for easy, 2 for medium, etc.
+);
+
+-- Table to log each game session/match that occurs
+CREATE TABLE IF NOT EXISTS game_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_mode TEXT NOT NULL, -- e.g., 'Elimination', 'Scoring'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at DATETIME
+);
+
+-- Table to link users to game sessions and store their results
+-- This table is essential for tracking history and statistics
+CREATE TABLE IF NOT EXISTS session_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    session_id INTEGER NOT NULL,
+    score INTEGER DEFAULT 0,
+    rank INTEGER, -- Final rank in the game (e.g., 1 for winner)
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(session_id) REFERENCES game_sessions(id)
+);
+
+-- Table to log every single answer from every player (for replay functionality)
+CREATE TABLE IF NOT EXISTS game_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    selected_option INTEGER NOT NULL,
+    is_correct BOOLEAN NOT NULL,
+    response_time_ms INTEGER NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(session_id) REFERENCES game_sessions(id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(question_id) REFERENCES questions(id)
+);
+```
+
+## CMakeLists.txt
+``` cmake
 cmake_minimum_required(VERSION 3.10.0)
 project(Server VERSION 0.1.0 LANGUAGES C CXX)
 
@@ -15,6 +77,8 @@ set(SERVER_SOURCES
     src/network/ClientSession.cpp
     src/game/Room.cpp
     src/game/RoomManager.cpp
+    src/db/QuestionRepository.cpp
+    src/db/UserRepository.cpp
 )
 
 ### Third-party library handler ###
@@ -43,248 +107,14 @@ set(THIRDPARTY_SOURCES
 add_executable(server ${SERVER_SOURCES})
 target_link_libraries(server PRIVATE sqlite3 sqlite_modern_cpp bcrypt pthread dl)
 target_include_directories(server PRIVATE ${THIRDPARTY_SOURCES})
-
 ```
-
-## common/protocol.h
-``` h
-#pragma once
-
-#include <cstdint>
-
-#define MAX_EMAIL_LEN 64
-#define MAX_PASSWORD_LEN 64
-#define MAX_DISPLAY_NAME_LEN 32
-#define MAX_ROOM_NAME_LEN 32
-#define MAX_QUESTION_CONTENT_LEN 256
-#define MAX_OPTION_CONTENT_LEN 128
-#define MAX_ROOMS_PER_LIST 50
-#define MAX_PLAYERS_PER_ROOM 10
-#define MAX_ERROR_MSG_LEN 128
-
-enum class MessageType : uint16_t {
-    C2S_REGISTER_REQ,
-    S2C_REGISTER_RSP,
-    C2S_LOGIN_REQ,
-    S2C_LOGIN_RSP,
-    C2S_ACCOUNT_UPDATE_REQ,
-    S2C_ACCOUNT_UPDATE_RSP,
-
-    C2S_LIST_ROOMS_REQ,
-    S2C_LIST_ROOMS_RSP,
-    C2S_CREATE_ROOM_REQ,
-    S2C_CREATE_ROOM_RSP,
-    C2S_JOIN_ROOM_REQ,
-    S2C_JOIN_ROOM_RSP,
-    S2C_PLAYER_JOINED_NOTIF,
-    C2S_LEAVE_ROOM_REQ,
-    S2C_PLAYER_LEFT_NOTIF,
-    C2S_READY_STATUS_REQ,
-    S2C_READY_STATUS_NOTIF,
-
-    S2C_GAME_START_NOTIF,
-    S2C_QUESTION_NOTIF,
-    C2S_SUBMIT_ANSWER_REQ,
-    S2C_ROUND_RESULT_NOTIF,
-    S2C_PLAYER_ELIMINATED_NOTIF,
-    S2C_GAME_OVER_NOTIF,
-    C2S_LEAVE_MATCH_REQ,
-
-    C2S_GET_STATS_REQ,
-    S2C_GET_STATS_RSP,
-
-    S2C_ERROR_RSP
-};
-
-enum class StatusCode : uint8_t {
-    SUCCESS,
-    FAILURE_GENERIC,
-    EMAIL_EXISTS,
-    INVALID_CREDENTIALS,
-    ROOM_FULL,
-    ROOM_NOT_FOUND,
-    GAME_IN_PROGRESS,
-    INVALID_REQUEST
-};
-
-enum class GameMode : uint8_t {
-    ELIMINATION,
-    SCORING
-};
-
-#pragma pack(push, 1)
-
-struct MessageHeader {
-    MessageType type;
-    uint32_t body_len;
-};
-
-struct RegisterRequest {
-    char email[MAX_EMAIL_LEN];
-    char display_name[MAX_DISPLAY_NAME_LEN];
-    char password[MAX_PASSWORD_LEN];
-};
-
-struct LoginRequest {
-    char email[MAX_EMAIL_LEN];
-    char password[MAX_PASSWORD_LEN];
-};
-
-struct AccountUpdateRequest {
-    char new_display_name[MAX_DISPLAY_NAME_LEN];
-    // may add more options to change other stats
-};
-
-struct StatusResponse {
-    StatusCode code;
-};
-
-struct LoginResponse {
-    StatusCode code;
-    uint32_t user_id;
-    char display_name[MAX_DISPLAY_NAME_LEN];
-};
-
-struct RoomInfo {
-    uint32_t room_id;
-    char room_name[MAX_ROOM_NAME_LEN];
-    uint8_t current_players;
-    uint8_t max_players;
-    GameMode game_mode;
-    bool is_in_game;
-};
-
-struct ListRoomsResponse {
-    uint16_t room_count;
-    RoomInfo rooms[MAX_ROOMS_PER_LIST];
-};
-
-struct CreateRoomRequest {
-    char room_name[MAX_ROOM_NAME_LEN];
-    GameMode game_mode;
-    uint8_t num_questions;
-};
-
-struct CreateRoomResponse {
-    StatusCode code;
-    RoomInfo room_info;
-};
-
-struct JoinRoomRequest {
-    uint32_t room_id;
-};
-
-struct PlayerInfo {
-    uint32_t user_id;
-    char display_name[MAX_DISPLAY_NAME_LEN];
-    bool is_ready;
-};
-
-struct JoinRoomResponse {
-    StatusCode code;
-    RoomInfo room_info;
-    uint8_t player_count;
-    PlayerInfo players[MAX_PLAYERS_PER_ROOM];
-    uint32_t host_user_id;
-};
-
-struct PlayerLeftNotification {
-    uint32_t user_id;
-    uint32_t new_host_user_id;
-};
-
-struct ReadyStatusRequest {
-    bool is_ready;
-};
-
-struct ReadyStatusNotification {
-    uint32_t user_id;
-    bool is_ready;
-};
-
-struct GameStartNotification {
-    uint8_t player_count;
-    PlayerInfo players[MAX_PLAYERS_PER_ROOM];
-};
-
-struct QuestionNotification {
-    uint32_t question_id;
-    uint8_t time_limit_sec;
-    char content[MAX_QUESTION_CONTENT_LEN];
-    char options[4][MAX_OPTION_CONTENT_LEN];
-};
-
-struct SubmitAnswerRequest {
-    uint32_t question_id;
-    uint8_t selected_option;
-    uint32_t response_time_ms;
-};
-
-struct PlayerRoundResult {
-    uint32_t user_id;
-    int32_t score_change;
-    uint32_t total_score;
-    uint8_t correct_option;
-    uint32_t points_for_this_question; 
-    bool was_eliminated; 
-    bool answered_question;
-};
-
-struct RoundResultNotification {
-    uint8_t correct_option;
-    uint8_t result_count;
-    PlayerRoundResult results[MAX_PLAYERS_PER_ROOM];
-};
-
-struct PlayerEliminatedNotification {
-    uint32_t user_id;
-    uint32_t session_id;
-};
-
-struct PlayerFinalResult {
-    uint32_t user_id;
-    char display_name[MAX_DISPLAY_NAME_LEN];
-    uint32_t final_rank;
-    uint32_t final_score;
-};
-
-struct GameOverNotification {
-    uint8_t result_count;
-    PlayerFinalResult results[MAX_PLAYERS_PER_ROOM];
-};
-
-struct UserStatsResponse {
-    uint32_t total_matches;
-    uint32_t wins;
-    uint32_t total_correct_answers;
-    uint32_t total_incorrect_answers;
-    double average_score;
-
-    // We will need changes here based on how we calculates our score, implement later
-};
-
-struct ErrorResponse {
-    StatusCode code;
-    char message[MAX_ERROR_MSG_LEN];
-};
-
-#pragma pack(pop)
-```
-
-##  server/src/database_init.cpp 
-
-```cpp
-#include <iostream>
-
-```
-
----
 
 ##  server/src/main.cpp 
 
 ```cpp
 #include "network/Server.h"
 #include "db/DatabaseManager.h"
+#include <sqlite_modern_cpp.h>
 #include <iostream>
 
 int main(int argc, char** argv) {
@@ -304,77 +134,79 @@ int main(int argc, char** argv) {
 
 ---
 
-##  server/src/db/UserRepository.cpp 
+##  server/src/database_init.cpp 
 
 ```cpp
+#include "db/DatabaseManager.h"
 #include <iostream>
 
-```
+void initializeDatabase() {
+    try {
+        auto& db = DatabaseManager::getInstance().getDb();
+        
+        db << "CREATE TABLE IF NOT EXISTS users ("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+              "email TEXT UNIQUE NOT NULL, "
+              "display_name TEXT NOT NULL, "
+              "hashed_password TEXT NOT NULL, "
+              "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+              "ranked_points INTEGER DEFAULT 1000"
+              ");";
 
----
+        // Questions Table
+        db << "CREATE TABLE IF NOT EXISTS questions ("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+              "content TEXT NOT NULL, "
+              "option1 TEXT NOT NULL, "
+              "option2 TEXT NOT NULL, "
+              "option3 TEXT NOT NULL, "
+              "option4 TEXT NOT NULL, "
+              "correct_option INTEGER NOT NULL, "
+              "difficulty INTEGER DEFAULT 1"
+              ");";
 
-##  server/src/db/QuestionRepository.cpp 
+        // Game Sessions Table
+        // FIXED: Added total_pause_duration_ms to match Room.cpp persistence logic
+        db << "CREATE TABLE IF NOT EXISTS game_sessions ("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+              "game_mode TEXT NOT NULL, "
+              "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+              "ended_at DATETIME"
+              ");";
 
-```cpp
-#include <iostream>
+        // Session Participants Table
+        db << "CREATE TABLE IF NOT EXISTS session_participants ("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+              "user_id INTEGER NOT NULL, "
+              "session_id INTEGER NOT NULL, "
+              "score INTEGER DEFAULT 0, "
+              "rank INTEGER, "
+              "FOREIGN KEY(user_id) REFERENCES users(id), "
+              "FOREIGN KEY(session_id) REFERENCES game_sessions(id)"
+              ");";
 
-```
+        // Game Log Table
+        db << "CREATE TABLE IF NOT EXISTS game_log ("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+              "session_id INTEGER NOT NULL, "
+              "user_id INTEGER NOT NULL, "
+              "question_id INTEGER NOT NULL, "
+              "selected_option INTEGER NOT NULL, "
+              "is_correct BOOLEAN NOT NULL, "
+              "response_time_ms INTEGER NOT NULL, "
+              "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, "
+              "FOREIGN KEY(session_id) REFERENCES game_sessions(id), "
+              "FOREIGN KEY(user_id) REFERENCES users(id), "
+              "FOREIGN KEY(question_id) REFERENCES questions(id)"
+              ");";
+              
+        std::cout << "Database initialized successfully." << std::endl;
 
----
-
-##  server/src/db/DatabaseManager.h 
-
-```cpp
-#pragma once
-
-#include <string>
-#include <mutex>
-#include <optional>
-#include <memory>
-#include <sqlite_modern_cpp.h>
-#include "protocol.h"
-
-struct UserData {
-    uint32_t id;
-    std::string email;
-    std::string display_name;
-};
-
-class DatabaseManager {
-public:
-    static DatabaseManager& getInstance();
-    
-    StatusCode registerUser(const std::string& email, const std::string& display_name, const std::string& password);
-    std::optional<UserData> loginUser(const std::string& email, const std::string& password);
-
-private:
-    DatabaseManager();
-    ~DatabaseManager() = default;
-    
-    DatabaseManager(const DatabaseManager&) = delete;
-    DatabaseManager& operator=(const DatabaseManager&) = delete;
-
-    std::unique_ptr<sqlite::database> db;
-    std::mutex dbMutex;
-};
-```
-
----
-
-##  server/src/db/QuestionRepository.h 
-
-```cpp
-#include <iostream>
-
-```
-
----
-
-##  server/src/db/UserRepository.h 
-
-```cpp
-#include <iostream>
-
+    } catch (const std::exception& e) {
+        std::cerr << "Database Initialization Failed: " << e.what() << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
 ```
 
 ---
@@ -456,20 +288,404 @@ std::optional<UserData> DatabaseManager::loginUser(const std::string& email, con
 
 ---
 
-##  server/src/utils/PasswordUtils.h 
+##  server/src/db/QuestionRepository.cpp 
 
 ```cpp
+#include "QuestionRepository.h"
+#include "DatabaseManager.h"
 #include <iostream>
+
+std::vector<Question> QuestionRepository::getRandomQuestions(int count) {
+    std::vector<Question> questions;
+    try {
+        auto& db = DatabaseManager::getInstance().getDb();
+
+        db << "SELECT id, content, option1, option2, option3, option4, correct_option, difficulty "
+              "FROM questions ORDER BY RANDOM() LIMIT ?"
+           << count
+           >> [&](uint32_t id, std::string content, std::string o1, std::string o2, std::string o3, std::string o4, int correct, int diff) {
+               Question q;
+               q.id = id;
+               q.content = content;
+               q.options[0] = o1;
+               q.options[1] = o2;
+               q.options[2] = o3;
+               q.options[3] = o4;
+               q.correct_option = static_cast<uint8_t>(correct);
+               q.difficulty = static_cast<uint8_t>(diff);
+               questions.push_back(q);
+           };
+
+    } catch (const std::exception &e) {
+        std::cerr << "DB Error fetching questions: " << e.what() << std::endl;
+    }
+
+    return questions;
+}
+```
+
+---
+
+##  server/src/db/UserRepository.h 
+
+```cpp
+#pragma once
+
+#include <bits/stdc++.h>
+#include "protocol.h"
+
+class UserRepository {
+public:
+    static UserStatsResponse getUserStats(uint32_t userId);
+
+    struct RankUpdateInfo {
+        uint32_t user_id;
+        uint32_t rank;
+        uint32_t score;
+    };
+
+    static void updateUserRanks(const std::vector<RankUpdateInfo>& matchResults);
+
+private:
+    static uint32_t calculateNewElo(uint32_t currentElo, uint32_t opponentElo, double actualScore);
+};
+```
+
+---
+
+##  server/src/db/QuestionRepository.h 
+
+```cpp
+#pragma once
+
+#include <vector>
+#include <string>
+#include <cstdint>
+#include "protocol.h"
+
+struct Question {
+    uint32_t id;
+    std::string content;
+    std::string options[4];
+    uint8_t correct_option;
+    uint8_t difficulty;
+};
+
+class QuestionRepository {
+public:
+    std::vector<Question> getRandomQuestions(int count);
+};
+```
+
+---
+
+##  server/src/db/DatabaseManager.h 
+
+```cpp
+#pragma once
+
+#include <string>
+#include <mutex>
+#include <optional>
+#include <memory>
+#include <sqlite_modern_cpp.h>
+#include "protocol.h"
+
+struct UserData {
+    uint32_t id;
+    std::string email;
+    std::string display_name;
+};
+
+class DatabaseManager {
+public:
+    static DatabaseManager& getInstance();
+    sqlite::database& getDb() { return *db; } 
+    
+    StatusCode registerUser(const std::string& email, const std::string& display_name, const std::string& password);
+    std::optional<UserData> loginUser(const std::string& email, const std::string& password);
+
+private:
+    DatabaseManager();
+    ~DatabaseManager() = default;
+    
+    DatabaseManager(const DatabaseManager&) = delete;
+    DatabaseManager& operator=(const DatabaseManager&) = delete;
+
+    std::unique_ptr<sqlite::database> db;
+    std::mutex dbMutex;
+};
+```
+
+---
+
+##  server/src/db/UserRepository.cpp 
+
+```cpp
+#include "UserRepository.h"
+#include "DatabaseManager.h"
+#include <bits/stdc++.h>
+#include <algorithm>
+
+UserStatsResponse UserRepository::getUserStats(uint32_t userId) {
+    UserStatsResponse stats{};
+    // Default ranked points if no record found
+    stats.ranked_points = 1000;
+
+    auto fillModeStats = [&](const std::string& mode, UserModeStats& out) {
+        out.total_matches = 0;
+        out.wins = 0;
+        out.total_correct_answers = 0;
+        out.total_incorrect_answers = 0;
+        out.average_score = 0.0;
+        out.high_score = 0;
+
+        auto &db = DatabaseManager::getInstance().getDb();
+
+        db << "SELECT COUNT(*), IFNULL(SUM(CASE WHEN rank = 1 THEN 1 ELSE 0 END), 0) "
+              "FROM session_participants sp "
+              "JOIN game_sessions gs ON sp.session_id = gs.id "
+              "WHERE sp.user_id = ? AND gs.game_mode = ?"
+           << userId << mode
+           >> [&](int total, int wins) {
+                out.total_matches = total;
+                out.wins = wins;
+           };
+
+        db << "SELECT IFNULL(AVG(sp.score), 0), IFNULL(MAX(sp.score), 0) "
+              "FROM session_participants sp "
+              "JOIN game_sessions gs ON sp.session_id = gs.id "
+              "WHERE sp.user_id = ? AND gs.game_mode = ?"
+           << userId << mode
+           >> [&](double avg, int maxScore) {
+                out.average_score = avg;
+                out.high_score = static_cast<uint32_t>(std::max(0, maxScore));
+           };
+
+        db << "SELECT IFNULL(SUM(CASE WHEN gl.is_correct = 1 THEN 1 ELSE 0 END), 0), "
+              "       IFNULL(SUM(CASE WHEN gl.is_correct = 0 THEN 1 ELSE 0 END), 0) "
+              "FROM game_log gl "
+              "JOIN game_sessions gs ON gl.session_id = gs.id "
+              "WHERE gl.user_id = ? AND gs.game_mode = ?"
+           << userId << mode
+           >> [&](int correct, int incorrect) {
+                out.total_correct_answers = correct;
+                out.total_incorrect_answers = incorrect;
+           };
+    };
+
+    try {
+        auto &db = DatabaseManager::getInstance().getDb();
+
+        db << "SELECT ranked_points FROM users WHERE id = ?"
+           << userId
+           >> stats.ranked_points;
+
+        fillModeStats("Elimination", stats.elimination);
+        fillModeStats("Scoring", stats.scoring);
+    } catch (const std::exception &e) {
+        std::cerr << "DB Error getting stats: " << e.what() << std::endl;
+    }
+
+    return stats;
+}
+
+void UserRepository::updateUserRanks(const std::vector<RankUpdateInfo>& results) {
+    if (results.size() < 2) return;
+
+    try {
+        auto &db = DatabaseManager::getInstance().getDb();
+        db << "BEGIN TRANSACTION;";
+
+        uint64_t totalElo = 0;
+        std::vector<uint32_t> currentElos;
+
+        for (const auto &p : results) {
+            uint32_t elo = 1000;
+            db << "SELECT ranked_points FROM users WHERE id = ?" << p.user_id >> elo;
+            currentElos.push_back(elo);
+            totalElo += elo;
+        }
+
+        double avgElo = static_cast<double>(totalElo) / results.size();
+
+        for (size_t i = 0; i < results.size(); i++) {
+            uint32_t userId = results[i].user_id;
+            uint32_t oldElo = currentElos[i];
+            uint32_t rank = results[i].rank;
+
+            double actualScore = 1.0 - (double)(rank - 1) / (results.size() - 1);
+            if (results.size() == 1) actualScore = 1.0;
+            
+            double expectedScore = 1.0 / (1.0 + pow(10.0, (avgElo - oldElo) / 400.0));
+            int k = 32;
+
+            int change = static_cast<int>(k * (actualScore - expectedScore));
+            int newElo = static_cast<int>(oldElo) + change;
+            if (newElo < 0) newElo = 0;
+
+
+            db << "UPDATE users SET ranked_points = ? WHERE id = ?" 
+               << newElo << userId;
+        }
+        
+        db << "COMMIT;";
+        
+    } catch (const std::exception &e) {
+        std::cerr << "DB Error updating ranks: " << e.what() << std::endl;
+        DatabaseManager::getInstance().getDb() << "ROLLBACK;";
+    }
+}
+```
+
+---
+
+##  server/src/game/Room.h 
+
+```cpp
+#pragma once
+
+#include <bits/stdc++.h>
+#include "protocol.h"
+#include "../db/QuestionRepository.h"
+
+class ClientSession;
+
+enum class RoomState {
+    WAITING,
+    STARTING,
+    IN_GAME_QUESTION,
+    IN_GAME_RESULT,
+    PAUSED,
+    FINISHED
+};
+
+struct PlayerGameData {
+    ClientSession* session;
+    bool isReady = false;
+    uint32_t score = 0;
+    bool isEliminated = false;
+    
+    bool hasAnswered = false;
+    uint32_t lastResponseTimeMs = 0;
+    uint8_t selectedOption = 0;
+    int32_t lastScoreChange = 0;
+};
+
+class Room {
+public:
+    Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions);
+    ~Room() = default;
+
+    uint32_t getId() const;
+    uint32_t getHostId() const;
+    bool isFull();
+    bool isEmpty();
+    
+    bool addPlayer(ClientSession* session);
+    void removePlayer(uint32_t userId);
+    bool setPlayerReady(uint32_t userId, bool ready);
+    void handleStartGame(uint32_t userId);
+    void handleReturnToRoom(uint32_t userId);
+
+    // Main gameplay (submit answer, auto-update state on server)
+    void handleSubmitAnswer(uint32_t userId, const SubmitAnswerRequest& req);
+    void handlePauseGame(uint32_t userId);
+    void handleResumeGame(uint32_t userId);
+
+    void update(uint64_t nowMs);
+    
+    RoomInfo getRoomInfo() const;
+    void getPlayerList(JoinRoomResponse& response) const;
+
+
+private:
+    void broadcast(MessageType type, const void* data, uint32_t len, uint32_t excludeUserId = 0);
+
+    void startGame();
+    void nextRound();
+    void endRound();
+    void finishGame();
+    void terminateGame(TerminationReason reason);
+
+    void calculateScores();
+    bool allActivePlayersAnswered();
+    void persistResults(const std::vector<PlayerGameData*>& sortedPlayers, TerminationReason reason);
+
+    mutable std::mutex roomMutex;
+
+    uint32_t roomId;
+    uint32_t hostUserId;
+    std::string roomName;
+    GameMode gameMode;
+    uint8_t numQuestions;
+    uint8_t maxPlayers;
+    RoomState state;
+    RoomState previousState;
+    uint64_t stateStartTimeMs;
+    uint64_t sessionStartTimeMs;
+
+    uint64_t pauseStartTimeMs;
+    uint64_t totalPauseDurationMs;
+
+    std::map<uint32_t, PlayerGameData> participants;
+    std::vector<Question> questions;
+    uint8_t currentQuestionIndex;
+
+    const uint64_t START_DELAY_MS = 5000;
+    const uint64_t QUESTION_TIME_LIMIT_MS = 15000;
+    const uint64_t RESULT_DISPLAY_MS = 3000;
+
+    // struct PlayerEntry {
+    //     ClientSession* session;
+    //     bool isReady;
+    // };
+    // std::map<uint32_t, PlayerEntry> participants;
+
+    struct LogEntry {
+        uint32_t user_id;
+        uint32_t question_id;
+        uint8_t selected_option;
+        bool is_correct;
+        uint32_t response_time_ms;
+    };
+    std::vector<LogEntry> pendingLogs;
+    uint32_t dbSessionId = 0;
+
+};
 
 ```
 
 ---
 
-##  server/src/utils/Logger.h 
+##  server/src/game/RoomManager.h 
 
 ```cpp
-#include <iostream>
+#pragma once
 
+#include <unordered_map>
+#include <mutex>
+#include <memory>
+#include <atomic>
+#include "Room.h"
+
+class RoomManager {
+public:
+    RoomManager();
+    
+    Room* createRoom(uint32_t hostId, const CreateRoomRequest& req);
+    Room* getRoom(uint32_t roomId);
+    void getAllRooms(ListRoomsResponse& response);
+    void removeRoom(uint32_t roomId);
+    
+    bool leaveRoom(uint32_t roomId, uint32_t userId);
+    void updateAllRooms();
+
+private:
+    std::mutex managerMutex;
+    std::unordered_map<uint32_t, std::unique_ptr<Room>> activeRooms;
+    std::atomic<uint32_t> nextRoomId;
+};
 ```
 
 ---
@@ -532,37 +748,18 @@ bool RoomManager::leaveRoom(uint32_t roomId, uint32_t userId) {
     }
     return isEmpty;
 }
-```
 
----
+void RoomManager::updateAllRooms() {
+    std::lock_guard<std::mutex> lock(managerMutex);
 
-##  server/src/game/RoomManager.h 
-
-```cpp
-#pragma once
-
-#include <unordered_map>
-#include <mutex>
-#include <memory>
-#include <atomic>
-#include "Room.h"
-
-class RoomManager {
-public:
-    RoomManager();
+    uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
     
-    Room* createRoom(uint32_t hostId, const CreateRoomRequest& req);
-    Room* getRoom(uint32_t roomId);
-    void getAllRooms(ListRoomsResponse& response);
-    void removeRoom(uint32_t roomId);
-    
-    bool leaveRoom(uint32_t roomId, uint32_t userId);
-
-private:
-    std::mutex managerMutex;
-    std::unordered_map<uint32_t, std::unique_ptr<Room>> activeRooms;
-    std::atomic<uint32_t> nextRoomId;
-};
+    for (auto it = activeRooms.begin(); it != activeRooms.end(); ) {
+        it->second->update(now);
+        ++it;
+    } 
+}
 ```
 
 ---
@@ -573,8 +770,10 @@ private:
 #include <bits/stdc++.h>
 #include "../network/ClientSession.h"
 #include "Room.h"
+#include "../db/DatabaseManager.h"
+#include "../db/UserRepository.h"
 
-Room::Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions): roomId(id), hostUserId(hostId), roomName(std::move(name)), gameMode(mode), numQuestions(questions), maxPlayers(MAX_PLAYERS_PER_ROOM), state(RoomState::WAITING) {}
+Room::Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions): roomId(id), hostUserId(hostId), roomName(std::move(name)), gameMode(mode), numQuestions(questions), maxPlayers(MAX_PLAYERS_PER_ROOM), state(RoomState::WAITING), stateStartTimeMs(0), currentQuestionIndex(0), previousState(RoomState::WAITING), pauseStartTimeMs(0), totalPauseDurationMs(0), sessionStartTimeMs(0) {}
 
 uint32_t Room::getId() const {return roomId;}
 uint32_t Room::getHostId() const {return hostUserId;}
@@ -596,9 +795,12 @@ bool Room::addPlayer(ClientSession* session){
     if (state != RoomState::WAITING) return false;
 
     uint32_t uid = session->getUserId();
-    if (participants.find(uid) != participants.end()) return true;
+    if (participants.count(uid)) return true;
 
-    participants[uid] = {session, (uid==hostUserId)};
+    PlayerGameData pd;
+    pd.session = session;
+    pd.isReady = (uid == hostUserId);
+    participants[uid] = pd;
 
     PlayerInfo pInfo;
     pInfo.user_id = uid;
@@ -618,16 +820,24 @@ void Room::removePlayer(uint32_t userId) {
 
     participants.erase(it);
 
-    if (participants.empty()) return;
+    if (participants.empty()) {
+        state = RoomState::FINISHED;    
+        return;
+    }
+
+    uint32_t newHostId = hostUserId;
 
     if (userId == hostUserId) {
-        hostUserId = participants.begin()->first;
+        if (!participants.empty()) {
+            newHostId = participants.begin()->first;
+            hostUserId = newHostId;
+            std::cout << "[Room " << roomId << "] Host migrated from " << userId << " to " << newHostId << std::endl;
+        }
     }
 
     PlayerLeftNotification notif;
     notif.user_id = userId;
-    notif.new_host_user_id = hostUserId;
-    
+    notif.new_host_user_id = newHostId;
     broadcast(MessageType::S2C_PLAYER_LEFT_NOTIF, &notif, sizeof(notif));
 }
 
@@ -644,7 +854,73 @@ bool Room::setPlayerReady(uint32_t userId, bool ready) {
     notif.is_ready = ready;
 
     broadcast(MessageType::S2C_READY_STATUS_NOTIF, &notif, sizeof(notif));
+
+    // Auto-start disabled; wait for explicit C2S_START_GAME_REQ from host
     return true;
+}
+
+void Room::handleStartGame(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    
+    // Only host can start the game
+    if (userId != hostUserId) {
+        std::cout << "[Room " << roomId << "] Non-host user " << userId 
+                  << " attempted to start game (denied)" << std::endl;
+        return;
+    }
+    
+    // Check if all players are ready
+    if (participants.size() < 2) {
+        std::cout << "[Room " << roomId << "] Cannot start: need at least 2 players" << std::endl;
+        return;
+    }
+    
+    bool allReady = true;
+    for (const auto& p : participants) {
+        if (!p.second.isReady) {
+            allReady = false;
+            break;
+        }
+    }
+    
+    if (!allReady) {
+        std::cout << "[Room " << roomId << "] Cannot start: not all players ready" << std::endl;
+        return;
+    }
+    
+    std::cout << "[Room " << roomId << "] Host starting game with " 
+              << participants.size() << " players" << std::endl;
+    startGame();
+}
+
+void Room::handleReturnToRoom(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    
+    auto it = participants.find(userId);
+    if (it == participants.end()) return;
+    
+    // Reset player to waiting/not ready state
+    it->second.isReady = false;
+    it->second.score = 0;
+    it->second.isEliminated = false;
+    it->second.hasAnswered = false;
+    it->second.selectedOption = 0;
+    it->second.lastResponseTimeMs = 0;
+    it->second.lastScoreChange = 0;
+    
+    // Reset room to WAITING if it was FINISHED
+    if (state == RoomState::FINISHED) {
+        state = RoomState::WAITING;
+        currentQuestionIndex = 0;
+        questions.clear();
+        pendingLogs.clear();
+    }
+    
+    // Broadcast updated ready status to all players
+    ReadyStatusNotification notif;
+    notif.user_id = userId;
+    notif.is_ready = false;
+    broadcast(MessageType::S2C_READY_STATUS_NOTIF, &notif, sizeof(notif));
 }
 
 RoomInfo Room::getRoomInfo() const {
@@ -680,67 +956,379 @@ void Room::broadcast(MessageType type, const void* data, uint32_t len, uint32_t 
     for (auto& pair : participants) {
         if (pair.first != excludeUserId) {
             pair.second.session->sendMsg(type, data, len);
+            // Immediately flush to avoid epoll edge-triggered issues
+            pair.second.session->writeData();
         }
     }
 }
-```
 
----
-
-##  server/src/game/Room.h 
-
-```cpp
-#pragma once
-
-#include <bits/stdc++.h>
-#include "protocol.h"
-
-class ClientSession;
-
-enum class RoomState {
-    WAITING,
-    STARTING,
-    IN_GAME,
-    FINISHED
-};
-
-class Room {
-public:
-    Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions);
-    ~Room() = default;
-
-    uint32_t getId() const;
-    uint32_t getHostId() const;
-    bool isFull();
-    bool isEmpty();
+void Room::startGame() {
+    state = RoomState::STARTING;
+    stateStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    totalPauseDurationMs = 0;
+    sessionStartTimeMs = stateStartTimeMs;
     
-    bool addPlayer(ClientSession* session);
-    void removePlayer(uint32_t userId);
-    bool setPlayerReady(uint32_t userId, bool ready);
+    QuestionRepository repo;
+    questions = repo.getRandomQuestions(numQuestions);
+
+    GameStartNotification notif;
+    notif.player_count = 0;
+    for (const auto &p : participants) {
+        PlayerInfo &pi = notif.players[notif.player_count++];
+        pi.user_id = p.first;
+        pi.is_ready = true;
+        std::strncpy(pi.display_name, p.second.session->getDisplayName().c_str(), MAX_DISPLAY_NAME_LEN - 1);
+    }
+
+    broadcast(MessageType::S2C_GAME_START_NOTIF, &notif, sizeof(notif));
+}
+
+void Room::update(uint64_t nowMs) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+
+    if (state == RoomState::PAUSED || state == RoomState::WAITING || state == RoomState::FINISHED) return;
+
+    if (state == RoomState::STARTING) {
+        if (nowMs >= stateStartTimeMs + START_DELAY_MS) {
+            currentQuestionIndex = 0;
+            nextRound();
+        }
+    } else if (state == RoomState::IN_GAME_QUESTION) {
+        if (nowMs >= stateStartTimeMs + QUESTION_TIME_LIMIT_MS + 500) endRound();
+        else if (allActivePlayersAnswered()) endRound();
+    } else if (state == RoomState::IN_GAME_RESULT) {
+        if (nowMs >= stateStartTimeMs + RESULT_DISPLAY_MS) {
+            currentQuestionIndex++;
+            
+            // Check if game should end due to elimination
+            if (gameMode == GameMode::ELIMINATION) {
+                int activePlayers = 0;
+                for (const auto& p : participants) {
+                    if (!p.second.isEliminated) activePlayers++;
+                }
+                
+                // If 0 or 1 players left: Game ends (last survivor wins or no winner)
+                if (activePlayers <= 1) {
+                    finishGame();
+                    return;
+                }
+            }
+            
+            if (currentQuestionIndex >= questions.size()) finishGame();
+            else nextRound();
+        }
+    }
+}
+
+void Room::nextRound() {
+    state = RoomState::IN_GAME_QUESTION;
+    stateStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
     
-    RoomInfo getRoomInfo() const;
-    void getPlayerList(JoinRoomResponse& response) const;
+    for (auto &p : participants) {
+        p.second.hasAnswered = false;
+        p.second.selectedOption = 0;
+        p.second.lastScoreChange = 0;
+    }
 
-    void broadcast(MessageType type, const void* data, uint32_t len, uint32_t excludeUserId = 0);
+    if (currentQuestionIndex >= questions.size()){
+        finishGame();
+        return;
+    }
 
-private:
-    mutable std::mutex roomMutex;
+    const auto &q = questions[currentQuestionIndex];
+    QuestionNotification notif;
+    notif.question_id = q.id;
+    notif.time_limit_sec = static_cast<uint8_t>(QUESTION_TIME_LIMIT_MS / 1000);
+    std::strncpy(notif.content, q.content.c_str(), MAX_QUESTION_CONTENT_LEN - 1);
+    for (int i = 0; i < 4; i++) {
+        std::strncpy(notif.options[i], q.options[i].c_str(), MAX_OPTION_CONTENT_LEN - 1);
+    }
 
-    uint32_t roomId;
-    uint32_t hostUserId;
-    std::string roomName;
-    GameMode gameMode;
-    uint8_t numQuestions;
-    uint8_t maxPlayers;
-    RoomState state;
+    broadcast(MessageType::S2C_QUESTION_NOTIF, &notif, sizeof(notif));
+}
 
-    struct PlayerEntry {
-        ClientSession* session;
-        bool isReady;
-    };
-    std::map<uint32_t, PlayerEntry> participants;
-};
+void Room::handleSubmitAnswer(uint32_t userId, const SubmitAnswerRequest& req) {
+    std::lock_guard<std::mutex> lock(roomMutex);
 
+    if (state != RoomState::IN_GAME_QUESTION) return;
+    auto it = participants.find(userId);
+    if (it == participants.end()) return;
+    if (it->second.isEliminated || it->second.hasAnswered) return;
+
+    uint64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    uint64_t measuredLatency = static_cast<uint64_t>(nowMs - stateStartTimeMs);
+    uint32_t clientReportedTime = req.response_time_ms;
+    uint64_t maxAllowed = static_cast<uint32_t>(QUESTION_TIME_LIMIT_MS + 500);
+
+    it->second.hasAnswered = true;
+    it->second.selectedOption = req.selected_option;
+    
+    if (clientReportedTime > maxAllowed || clientReportedTime < (measuredLatency > 200 ? measuredLatency - 200 : 0))
+        it->second.lastResponseTimeMs = static_cast<uint32_t>(measuredLatency);
+    else
+        it->second.lastResponseTimeMs = clientReportedTime;
+
+    pendingLogs.push_back({
+        userId,
+        questions[currentQuestionIndex].id,
+        req.selected_option,
+        (req.selected_option == questions[currentQuestionIndex].correct_option),
+        it->second.lastResponseTimeMs
+    });
+}
+
+void Room::endRound() {
+    calculateScores();
+    state = RoomState::IN_GAME_RESULT;
+    stateStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+
+    RoundResultNotification notif;
+    notif.correct_option = questions[currentQuestionIndex].correct_option;
+    notif.result_count = 0;
+
+    for (const auto &p: participants) {
+        PlayerRoundResult& res = notif.results[notif.result_count++];
+        res.user_id = p.first;
+        res.score_change = p.second.lastScoreChange;
+        res.total_score = p.second.score;
+        res.correct_option = questions[currentQuestionIndex].correct_option;
+        res.points_for_this_question = (p.second.lastScoreChange > 0) ? p.second.lastScoreChange : 0;
+        res.was_eliminated = p.second.isEliminated;
+        res.answered_question = p.second.hasAnswered;
+    }
+
+    broadcast(MessageType::S2C_ROUND_RESULT_NOTIF, &notif, sizeof(notif));
+
+    if (gameMode == GameMode::ELIMINATION) {
+        for (const auto &p : participants) {
+            if (p.second.isEliminated && p.second.lastScoreChange == -1) {
+                PlayerEliminatedNotification elimNotif;
+                elimNotif.user_id = p.first;
+                elimNotif.session_id = 0;
+                broadcast(MessageType::S2C_PLAYER_ELIMINATED_NOTIF, &elimNotif, sizeof(elimNotif));
+            }
+        }
+    }
+}
+
+void Room::calculateScores() {
+    uint8_t correctOpt = questions[currentQuestionIndex].correct_option;
+
+    for (auto& pair: participants) {
+        auto& p = pair.second;
+        if (p.isEliminated) continue;
+
+        bool correct = p.hasAnswered && (p.selectedOption == correctOpt);
+
+        if (gameMode == GameMode::SCORING) {
+            if (correct) {
+                double ratio = (double)p.lastResponseTimeMs / QUESTION_TIME_LIMIT_MS;
+                if (ratio > 1.0) ratio = 1.0;
+                int points = 1000 - (int)(500 * ratio);
+                p.score += points;
+                p.lastScoreChange = points;
+            }
+            else p.lastScoreChange = 0;
+        }
+
+        else if (gameMode == GameMode::ELIMINATION) {
+            if (!correct) {
+                p.isEliminated = true;
+                p.lastScoreChange = -1;
+            } else {
+                p.score += 100;
+                p.lastScoreChange = 100;
+            }
+        }
+    }
+}
+
+void Room::finishGame() {
+    state = RoomState::FINISHED;
+
+    std::vector<PlayerGameData*> sortedPlayers;
+    for (auto& p: participants) sortedPlayers.push_back(&p.second);
+
+    std::sort(sortedPlayers.begin(), sortedPlayers.end(), [](PlayerGameData* a, PlayerGameData* b) {
+        if (a->isEliminated != b->isEliminated) return !a->isEliminated;
+        return a->score > b->score;
+    });
+
+    GameOverNotification notif;
+    notif.result_count = 0;
+    notif.winner_count = 0;
+    notif.end_reason = GameEndReason::SINGLE_WINNER;
+
+    // Check for draw: multiple players with same highest score and not eliminated
+    int activePlayers = 0;
+    uint32_t maxScore = 0;
+    for (const auto* p : sortedPlayers) {
+        if (!p->isEliminated) {
+            activePlayers++;
+            if (activePlayers == 1) maxScore = p->score;
+        }
+    }
+
+    // Count how many non-eliminated players have the max score (draw condition)
+    int winnersCount = 0;
+    if (activePlayers > 0) {
+        for (const auto* p : sortedPlayers) {
+            if (!p->isEliminated && p->score == maxScore) {
+                winnersCount++;
+            }
+        }
+    } else {
+        // No winner - everyone eliminated (wipeout scenario)
+        notif.end_reason = GameEndReason::NO_WINNER_WIPEOUT;
+    }
+
+    // Set end reason: draw if multiple winners, single winner if one, wipeout if none
+    if (notif.end_reason != GameEndReason::NO_WINNER_WIPEOUT) {
+        notif.end_reason = (winnersCount > 1) ? GameEndReason::DRAW : GameEndReason::SINGLE_WINNER;
+    }
+    notif.winner_count = winnersCount;
+
+    std::vector<UserRepository::RankUpdateInfo> eloUpdates;
+
+    for (size_t i = 0; i < sortedPlayers.size(); ++i) {
+        PlayerFinalResult& res = notif.results[notif.result_count++];
+        res.user_id = sortedPlayers[i]->session->getUserId();
+        std::strncpy(res.display_name, sortedPlayers[i]->session->getDisplayName().c_str(), MAX_DISPLAY_NAME_LEN - 1);
+        res.final_rank = static_cast<uint32_t>(i + 1);
+        res.final_score = sortedPlayers[i]->score;
+        
+        // Mark as winner if in draw/single winner scenario
+        if (!sortedPlayers[i]->isEliminated && sortedPlayers[i]->score == maxScore) {
+            res.is_winner = true;
+        } else {
+            res.is_winner = false;
+        }
+
+        eloUpdates.push_back({res.user_id, res.final_rank, res.final_score});
+    }
+
+    std::cout << "[Room " << roomId << "] Game Over: end_reason=" << (int)notif.end_reason 
+              << " winners=" << (int)notif.winner_count << std::endl;
+
+    broadcast(MessageType::S2C_GAME_OVER_NOTIF, &notif, sizeof(notif));
+
+    persistResults(sortedPlayers, TerminationReason::UNKNOWN);
+    UserRepository::updateUserRanks(eloUpdates);
+}
+
+void Room::persistResults(const std::vector<PlayerGameData*>& sortedPlayers, TerminationReason reason) {
+    try {
+        auto& db = DatabaseManager::getInstance().getDb();
+        
+        db << "BEGIN TRANSACTION;";
+
+        auto msToIso = [](uint64_t ms)->std::string {
+            std::time_t t = static_cast<std::time_t>(ms/1000);
+            std::tm tm{};
+            gmtime_r(&t, &tm);
+            char buf[50];
+            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
+            return std::string(buf);
+        };
+        uint64_t endMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        uint64_t startMs = (sessionStartTimeMs != 0) ? sessionStartTimeMs : endMs;
+        std::string startIso = msToIso(startMs);
+        std::string endIso = msToIso(endMs);
+
+        std::string modeStr = (gameMode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
+        db << "INSERT INTO game_sessions (game_mode, created_at, ended_at) VALUES (?, ?, ?);" 
+           << modeStr << startIso << endIso;
+        
+        uint32_t sessionId = 0;
+        db << "SELECT last_insert_rowid();" >> sessionId;
+
+        for (size_t i = 0; i < sortedPlayers.size(); ++i) {
+            db << "INSERT INTO session_participants (user_id, session_id, score, rank) VALUES (?, ?, ?, ?);"
+               << sortedPlayers[i]->session->getUserId()
+               << sessionId
+               << sortedPlayers[i]->score
+               << static_cast<uint32_t>(i + 1);
+        }
+
+        for (const auto& log : pendingLogs) {
+            db << "INSERT INTO game_log (session_id, user_id, question_id, selected_option, is_correct, response_time_ms) VALUES (?, ?, ?, ?, ?, ?);"
+               << sessionId
+               << log.user_id
+               << log.question_id
+               << static_cast<int>(log.selected_option)
+               << (log.is_correct ? 1 : 0)
+               << log.response_time_ms;
+        }
+
+        db << "COMMIT;";
+        std::cout << "[Room " << roomId << "] Game results persisted. Session ID: " << sessionId << std::endl;
+        sessionStartTimeMs = 0;
+    } catch (const std::exception& e) {
+        DatabaseManager::getInstance().getDb() << "ROLLBACK;";
+        std::cerr << "Persistence Error: " << e.what() << std::endl;
+    }
+}
+
+bool Room::allActivePlayersAnswered() {
+    for (const auto &p : participants) {
+        if (!p.second.isEliminated && !p.second.hasAnswered) return false;
+    }
+    return true;
+}
+
+void Room::handlePauseGame(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    if (userId != hostUserId) return;
+    if (state != RoomState::IN_GAME_QUESTION && state != RoomState::IN_GAME_RESULT) return;
+
+    previousState = state;
+    state = RoomState::PAUSED;
+    pauseStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    GamePausedNotification notif;
+    broadcast(MessageType::S2C_GAME_PAUSED_NOTIF, &notif, sizeof(notif));
+}
+
+void Room::handleResumeGame(uint32_t userId) {
+    std::lock_guard<std::mutex> lock(roomMutex);
+    if (userId != hostUserId || state != RoomState::PAUSED) return;
+
+    uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    uint64_t duration = now - pauseStartTimeMs;
+    totalPauseDurationMs += duration;
+
+    stateStartTimeMs += duration;
+
+    state = previousState;
+
+    GameResumedNotification notif;
+    broadcast(MessageType::S2C_GAME_RESUMED_NOTIF, &notif, sizeof(notif));
+}
+
+void Room::terminateGame(TerminationReason reason) {
+    state = RoomState::FINISHED;
+
+    GameTerminatedNotification notif;
+    notif.reason = reason;
+    broadcast(MessageType::S2C_GAME_TERMINATED_NOTIF, &notif, sizeof(notif));
+
+    std::vector<PlayerGameData*> sortedPlayers;
+    for (auto &p: participants) sortedPlayers.push_back(&p.second);
+    std::sort(sortedPlayers.begin(), sortedPlayers.end(), [](PlayerGameData* a , PlayerGameData* b){
+        if (a->isEliminated != b->isEliminated) return !a->isEliminated;
+        return a->score > b->score;
+    });
+
+    persistResults(sortedPlayers, reason);
+}
 ```
 
 ---
@@ -751,6 +1339,7 @@ private:
 #include "ClientSession.h"
 #include "Server.h"
 #include "../db/DatabaseManager.h"
+#include "../db/UserRepository.h"
 #include <unistd.h>
 #include <sys/socket.h>
 #include <cstring>
@@ -845,6 +1434,26 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
             if (state.isAuthenticated && body.size() >= sizeof(ReadyStatusRequest))
                 handleReadyStatus((const ReadyStatusRequest*)body.data());
             break;
+        case MessageType::C2S_START_GAME_REQ:
+            if (state.isAuthenticated)
+                handleStartGame();
+            break;
+        case MessageType::C2S_SUBMIT_ANSWER_REQ:
+            if (state.isAuthenticated && body.size() >= sizeof(SubmitAnswerRequest))
+                handleSubmitAnswer(reinterpret_cast<const SubmitAnswerRequest*>(body.data()));
+            break;
+        case MessageType::C2S_RETURN_TO_ROOM_REQ:
+            if (state.isAuthenticated) handleReturnToRoom();
+            break;
+        case MessageType::C2S_GET_STATS_REQ:
+            if (state.isAuthenticated) handleGetStats();
+            break;
+        case MessageType::C2S_PAUSE_GAME_REQ:
+            if (state.isAuthenticated) handlePauseGame();
+            break;
+        case MessageType::C2S_RESUME_GAME_REQ:
+            if (state.isAuthenticated) handleResumeGame();
+            break;
         default:
             break;
     }
@@ -904,6 +1513,15 @@ void ClientSession::handleCreateRoom(const CreateRoomRequest* req){
         rsp.code = StatusCode::SUCCESS;
         rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_CREATE_ROOM_RSP, &rsp, sizeof(rsp));
+        
+        // Send host the full player list after room creation
+        JoinRoomResponse playerListRsp{};
+        playerListRsp.code = StatusCode::SUCCESS;
+        playerListRsp.room_info = room->getRoomInfo();  // ✅ Set room_info first
+        playerListRsp.host_user_id = room->getHostId();
+        room->getPlayerList(playerListRsp);  // Populate player list
+        sendMsg(MessageType::S2C_JOIN_ROOM_RSP, &playerListRsp, sizeof(playerListRsp));
+        writeData(); // Flush immediately for consistency
     }
 }
 
@@ -915,23 +1533,40 @@ void ClientSession::handleListRooms() {
 
 void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
     if (state.currentRoomId != 0) {
-        JoinRoomResponse rsp;
+        // If the client requests the room they are already in, return success with current data
+        if (req->room_id == state.currentRoomId) {
+            Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+            if (room) {
+                JoinRoomResponse rsp{};
+                rsp.code = StatusCode::SUCCESS;
+                rsp.room_info = room->getRoomInfo();
+                rsp.host_user_id = room->getHostId();
+                room->getPlayerList(rsp);
+                sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
+                return;
+            }
+        }
+        // Otherwise reject cross-room joins
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::FAILURE_GENERIC; 
+        rsp.room_info.room_id = state.currentRoomId;
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
         return;
     }
 
     Room* room = server->getRoomManager()->getRoom(req->room_id);
     if (!room) {
-        JoinRoomResponse rsp;
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::ROOM_NOT_FOUND;
+        rsp.room_info.room_id = req->room_id;
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
         return;
     }
 
     if (room->isFull()) {
-        JoinRoomResponse rsp;
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::ROOM_FULL;
+        rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
         return;
     }
@@ -945,8 +1580,9 @@ void ClientSession::handleJoinRoom(const JoinRoomRequest* req) {
         room->getPlayerList(rsp);
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
     } else {
-        JoinRoomResponse rsp;
+        JoinRoomResponse rsp{};
         rsp.code = StatusCode::GAME_IN_PROGRESS;
+        rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_JOIN_ROOM_RSP, &rsp, sizeof(rsp));
     }
 }
@@ -965,6 +1601,15 @@ void ClientSession::handleReadyStatus(const ReadyStatusRequest* req) {
     Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
     if (room) {
         room->setPlayerReady(state.userId, req->is_ready);
+    }
+}
+
+void ClientSession::handleStartGame() {
+    if (state.currentRoomId == 0) return;
+
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleStartGame(state.userId);
     }
 }
 
@@ -1000,6 +1645,47 @@ void ClientSession::writeData() {
 void ClientSession::sendMsg(MessageType type, const void* data, uint32_t len) {
     sendResponse(type, data, len);
 }
+
+void ClientSession::handleSubmitAnswer(const SubmitAnswerRequest* req) {
+    if (state.currentRoomId == 0) return;
+
+    Room *room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleSubmitAnswer(state.userId, *req);
+    }
+}
+
+void ClientSession::handleGetStats() {
+    UserStatsResponse stats = UserRepository::getUserStats(state.userId);
+    sendResponse(MessageType::S2C_GET_STATS_RSP, &stats, sizeof(stats));
+}
+
+void ClientSession::handleReturnToRoom() {
+    if (state.currentRoomId == 0) return;
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleReturnToRoom(state.userId);
+        StatusResponse rsp;
+        rsp.code = StatusCode::SUCCESS;
+        sendResponse(MessageType::S2C_RETURN_TO_ROOM_RSP, &rsp, sizeof(rsp));
+    }
+}
+
+void ClientSession::handlePauseGame() {
+    if (state.currentRoomId == 0) return;
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handlePauseGame(state.userId);
+    }
+}
+
+void ClientSession::handleResumeGame() {
+    if (state.currentRoomId == 0) return;
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (room) {
+        room->handleResumeGame(state.userId);
+    }
+}
 ```
 
 ---
@@ -1034,67 +1720,6 @@ private:
 
     static const int MAX_EVENTS = 64;
     struct epoll_event events[MAX_EVENTS];
-};
-```
-
----
-
-##  server/src/network/ClientSession.h 
-
-```cpp
-#pragma once
-
-#include <vector>
-#include <cstdint>
-#include <string>
-#include "protocol.h"
-
-class Server;
-
-struct SessionState {
-    bool isAuthenticated = false;
-    uint32_t userId = 0;
-    std::string displayName;
-    uint32_t currentRoomId = 0;
-};
-
-class ClientSession {
-public:
-    ClientSession(int fd, Server* server);
-    ~ClientSession();
-
-    void readData();
-    bool wantWrite() const;
-    void writeData();
-    int getFd() const { return clientFd; }
-    bool isMarkedForDeletion() const { return markedForDeletion; }
-
-    uint32_t getUserId() const { return state.userId; }
-    std::string getDisplayName() const { return state.displayName; }
-    void sendMsg(MessageType type, const void* data, uint32_t len);
-    void onDisconnect();
-private:
-    void processBuffer();
-    void handleMessage(const MessageHeader& header, const std::vector<uint8_t>& body);
-    
-    void handleRegister(const RegisterRequest* req);
-    void handleLogin(const LoginRequest* req);
-    void handleCreateRoom(const CreateRoomRequest* req);
-    void handleListRooms();
-    void handleJoinRoom(const JoinRoomRequest* req);
-    void handleLeaveRoom();
-    void handleReadyStatus(const ReadyStatusRequest* req);
-
-    void sendResponse(MessageType type, const void* data, uint32_t len);
-
-    int clientFd;
-    Server* server;
-    bool markedForDeletion;
-    
-    std::vector<uint8_t> recvBuffer;
-    std::vector<uint8_t> sendBuffer;
-
-    SessionState state;
 };
 ```
 
@@ -1173,7 +1798,7 @@ void Server::setNonBlocking(int fd) {
 
 void Server::run() {
     while (true) {
-        int nfds = epoll_wait(epollFd, events, MAX_EVENTS, -1);
+        int nfds = epoll_wait(epollFd, events, MAX_EVENTS, 50);
 
         for (int i = 0; i < nfds; ++i) {
             int fd = events[i].data.fd;
@@ -1206,6 +1831,7 @@ void Server::run() {
                 }
             }
         }
+        roomManager->updateAllRooms();
     }
 }
 
@@ -1225,6 +1851,91 @@ void Server::handleAccept() {
     ev.data.fd = clientFd;
     epoll_ctl(epollFd, EPOLL_CTL_ADD, clientFd, &ev);
 }
+```
+
+---
+
+##  server/src/network/ClientSession.h 
+
+```cpp
+#pragma once
+
+#include <vector>
+#include <cstdint>
+#include <string>
+#include "protocol.h"
+
+class Server;
+
+struct SessionState {
+    bool isAuthenticated = false;
+    uint32_t userId = 0;
+    std::string displayName;
+    uint32_t currentRoomId = 0;
+};
+
+class ClientSession {
+public:
+    ClientSession(int fd, Server* server);
+    ~ClientSession();
+
+    void readData();
+    bool wantWrite() const;
+    void writeData();
+    int getFd() const { return clientFd; }
+    bool isMarkedForDeletion() const { return markedForDeletion; }
+
+    uint32_t getUserId() const { return state.userId; }
+    std::string getDisplayName() const { return state.displayName; }
+    void sendMsg(MessageType type, const void* data, uint32_t len);
+    void onDisconnect();
+private:
+    void processBuffer();
+    void handleMessage(const MessageHeader& header, const std::vector<uint8_t>& body);
+    
+    void handleRegister(const RegisterRequest* req);
+    void handleLogin(const LoginRequest* req);
+    void handleCreateRoom(const CreateRoomRequest* req);
+    void handleListRooms();
+    void handleJoinRoom(const JoinRoomRequest* req);
+    void handleLeaveRoom();
+    void handleReadyStatus(const ReadyStatusRequest* req);
+    void handleStartGame();
+    void handleSubmitAnswer(const SubmitAnswerRequest* req);
+    void handleReturnToRoom();
+    void handleGetStats();
+    void handlePauseGame();
+    void handleResumeGame();
+
+    void sendResponse(MessageType type, const void* data, uint32_t len);
+
+    int clientFd;
+    Server* server;
+    bool markedForDeletion;
+    
+    std::vector<uint8_t> recvBuffer;
+    std::vector<uint8_t> sendBuffer;
+
+    SessionState state;
+};
+```
+
+---
+
+##  server/src/utils/PasswordUtils.h 
+
+```cpp
+#include <iostream>
+
+```
+
+---
+
+##  server/src/utils/Logger.h 
+
+```cpp
+#include <iostream>
+
 ```
 
 ---

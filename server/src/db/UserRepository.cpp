@@ -106,6 +106,7 @@ void UserRepository::updateUserRanks(const std::vector<RankUpdateInfo>& results)
         }
         
         db << "COMMIT;";
+        
     } catch (const std::exception &e) {
         std::cerr << "DB Error updating ranks: " << e.what() << std::endl;
         DatabaseManager::getInstance().getDb() << "ROLLBACK;";

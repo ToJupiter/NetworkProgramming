@@ -116,6 +116,10 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
         case MessageType::C2S_RESUME_GAME_REQ:
             if (state.isAuthenticated) handleResumeGame();
             break;
+        case MessageType::C2S_GET_REPLAY_REQ:
+            if (state.isAuthenticated && body.size() >= sizeof(GetReplayRequest))
+                handleGetReplay(reinterpret_cast<const GetReplayRequest*>(body.data()));
+            break;
         default:
             break;
     }
@@ -176,14 +180,13 @@ void ClientSession::handleCreateRoom(const CreateRoomRequest* req){
         rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_CREATE_ROOM_RSP, &rsp, sizeof(rsp));
         
-        // Send host the full player list after room creation
         JoinRoomResponse playerListRsp{};
         playerListRsp.code = StatusCode::SUCCESS;
-        playerListRsp.room_info = room->getRoomInfo();  // ✅ Set room_info first
+        playerListRsp.room_info = room->getRoomInfo();
         playerListRsp.host_user_id = room->getHostId();
-        room->getPlayerList(playerListRsp);  // Populate player list
+        room->getPlayerList(playerListRsp);
         sendMsg(MessageType::S2C_JOIN_ROOM_RSP, &playerListRsp, sizeof(playerListRsp));
-        writeData(); // Flush immediately for consistency
+        writeData();
     }
 }
 
@@ -346,5 +349,43 @@ void ClientSession::handleResumeGame() {
     Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
     if (room) {
         room->handleResumeGame(state.userId);
+    }
+}
+
+void ClientSession::handleGetReplay(const GetReplayRequest* req) {
+    ReplayDataResponse response{};
+    try {
+        auto &db = DatabaseManager::getInstance().getDb();
+
+        int participationCount = 0;
+        db << "SELECT COUNT(*) FROM session_participants WHERE session_id = ? AND user_id = ?"
+        << req->session_id << state.userId >> participationCount;
+
+        if (participationCount == 0)
+            response.status = StatusCode::INVALID_REQUEST;
+        else {
+            std::string gameMode;
+            db << "SELECT game_mode FROM game_sessions WHERE id = ?" 
+               << req->session_id >> gameMode;
+            response.game_mode = (gameMode == "Elimination") ? GameMode::ELIMINATION : GameMode::SCORING;
+
+            db << "SELECT question_id, user_id, selected_option, is_correct, response_time_ms, unixepoch(timestamp) "
+              "FROM game_log WHERE session_id = ? ORDER BY id ASC" << req->session_id
+           >> [&](uint32_t qid, uint32_t uid, uint8_t opt, bool correct, uint32_t resp_time, uint64_t timestamp) {
+              if (response.event_count < 10000) {
+                  auto& event = response.events[response.event_count++];
+                  event.question_id = qid;
+                  event.user_id = uid;
+                  event.selected_option = opt;
+                  event.is_correct = correct;
+                  event.response_time_ms = resp_time;
+                  event.timestamp_ms = timestamp * 1000; 
+              }
+           };
+        response.status = StatusCode::SUCCESS;
+        }
+        sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
+    } catch (std::exception &e) {
+        std::cerr << "DB Error getting replay" << e.what() << std::endl;
     }
 }

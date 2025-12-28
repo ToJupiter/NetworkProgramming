@@ -46,6 +46,7 @@ private:
     void handleGetStats();
     void handlePauseGame();
     void handleResumeGame();
+    void handleGetReplay(const GetReplayRequest* req);
 
     void sendResponse(MessageType type, const void* data, uint32_t len);
 

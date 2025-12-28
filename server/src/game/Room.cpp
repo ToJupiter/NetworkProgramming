@@ -4,7 +4,7 @@
 #include "../db/DatabaseManager.h"
 #include "../db/UserRepository.h"
 
-Room::Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions): roomId(id), hostUserId(hostId), roomName(std::move(name)), gameMode(mode), numQuestions(questions), maxPlayers(MAX_PLAYERS_PER_ROOM), state(RoomState::WAITING), stateStartTimeMs(0), currentQuestionIndex(0), previousState(RoomState::WAITING), pauseStartTimeMs(0), totalPauseDurationMs(0) {}
+Room::Room(uint32_t id, uint32_t hostId, std::string name, GameMode mode, uint8_t questions): roomId(id), hostUserId(hostId), roomName(std::move(name)), gameMode(mode), numQuestions(questions), maxPlayers(MAX_PLAYERS_PER_ROOM), state(RoomState::WAITING), stateStartTimeMs(0), currentQuestionIndex(0), previousState(RoomState::WAITING), pauseStartTimeMs(0), totalPauseDurationMs(0), sessionStartTimeMs(0) {}
 
 uint32_t Room::getId() const {return roomId;}
 uint32_t Room::getHostId() const {return hostUserId;}
@@ -56,24 +56,20 @@ void Room::removePlayer(uint32_t userId) {
         return;
     }
 
+    uint32_t newHostId = hostUserId;
+
     if (userId == hostUserId) {
-        if (state == RoomState::WAITING){
-            hostUserId = participants.begin()->first;
-            PlayerLeftNotification notif;
-            notif.user_id = userId;
-            notif.new_host_user_id = hostUserId;
-            broadcast(MessageType::S2C_PLAYER_LEFT_NOTIF, &notif, sizeof(notif));
-        } else {
-            terminateGame(TerminationReason::HOST_LEFT);
-            return;
+        if (!participants.empty()) {
+            newHostId = participants.begin()->first;
+            hostUserId = newHostId;
+            std::cout << "[Room " << roomId << "] Host migrated from " << userId << " to " << newHostId << std::endl;
         }
-    } else {
-        PlayerLeftNotification notif;
-        notif.user_id = userId;
-        notif.new_host_user_id = hostUserId;
-        broadcast(MessageType::S2C_PLAYER_LEFT_NOTIF, &notif, sizeof(notif));
     }
 
+    PlayerLeftNotification notif;
+    notif.user_id = userId;
+    notif.new_host_user_id = newHostId;
+    broadcast(MessageType::S2C_PLAYER_LEFT_NOTIF, &notif, sizeof(notif));
 }
 
 bool Room::setPlayerReady(uint32_t userId, bool ready) {
@@ -202,6 +198,7 @@ void Room::startGame() {
     stateStartTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
     totalPauseDurationMs = 0;
+    sessionStartTimeMs = stateStartTimeMs;
     
     QuestionRepository repo;
     questions = repo.getRandomQuestions(numQuestions);
@@ -461,9 +458,22 @@ void Room::persistResults(const std::vector<PlayerGameData*>& sortedPlayers, Ter
         
         db << "BEGIN TRANSACTION;";
 
+        auto msToIso = [](uint64_t ms)->std::string {
+            std::time_t t = static_cast<std::time_t>(ms/1000);
+            std::tm tm{};
+            gmtime_r(&t, &tm);
+            char buf[50];
+            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
+            return std::string(buf);
+        };
+        uint64_t endMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        uint64_t startMs = (sessionStartTimeMs != 0) ? sessionStartTimeMs : endMs;
+        std::string startIso = msToIso(startMs);
+        std::string endIso = msToIso(endMs);
+
         std::string modeStr = (gameMode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
-        db << "INSERT INTO game_sessions (game_mode, ended_at, total_pause_duration_ms) VALUES (?, CURRENT_TIMESTAMP, ?);" 
-           << modeStr << static_cast<long long>(totalPauseDurationMs);
+        db << "INSERT INTO game_sessions (game_mode, created_at, ended_at) VALUES (?, ?, ?);" 
+           << modeStr << startIso << endIso;
         
         uint32_t sessionId = 0;
         db << "SELECT last_insert_rowid();" >> sessionId;
@@ -487,6 +497,8 @@ void Room::persistResults(const std::vector<PlayerGameData*>& sortedPlayers, Ter
         }
 
         db << "COMMIT;";
+        std::cout << "[Room " << roomId << "] Game results persisted. Session ID: " << sessionId << std::endl;
+        sessionStartTimeMs = 0;
     } catch (const std::exception& e) {
         DatabaseManager::getInstance().getDb() << "ROLLBACK;";
         std::cerr << "Persistence Error: " << e.what() << std::endl;

@@ -78,6 +78,7 @@ private:
     RoomState state;
     RoomState previousState;
     uint64_t stateStartTimeMs;
+    uint64_t sessionStartTimeMs;
 
     uint64_t pauseStartTimeMs;
     uint64_t totalPauseDurationMs;

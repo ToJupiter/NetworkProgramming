@@ -52,6 +52,9 @@ enum class MessageType : uint16_t {
     S2C_GAME_RESUMED_NOTIF,
     S2C_GAME_TERMINATED_NOTIF,
 
+    C2S_GET_REPLAY_REQ,
+    S2C_GET_REPLAY_RSP,
+
     S2C_ERROR_RSP
 };
 
@@ -242,6 +245,27 @@ struct UserStatsResponse {
     UserModeStats elimination;
     UserModeStats scoring;
     uint32_t ranked_points;
+};
+
+struct GetReplayRequest {
+    uint32_t session_id;
+};
+
+struct ReplayEvent {
+    uint32_t timestamp_ms;
+    uint32_t question_id;
+    uint32_t user_id;
+    uint8_t selected_option;
+    bool is_correct;
+    uint32_t response_time_ms;
+};
+
+struct ReplayDataResponse {
+    StatusCode status;
+    uint32_t session_id;
+    GameMode game_mode;
+    uint32_t event_count;
+    ReplayEvent events[10000];
 };
 
 struct PauseGameRequest {
