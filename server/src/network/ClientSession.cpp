@@ -120,6 +120,10 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
             if (state.isAuthenticated && body.size() >= sizeof(GetReplayRequest))
                 handleGetReplay(reinterpret_cast<const GetReplayRequest*>(body.data()));
             break;
+        case MessageType::C2S_GET_GAME_HISTORY_REQ:
+            if (state.isAuthenticated)
+                handleGetGameHistory();
+            break;
         default:
             break;
     }
@@ -369,23 +373,91 @@ void ClientSession::handleGetReplay(const GetReplayRequest* req) {
                << req->session_id >> gameMode;
             response.game_mode = (gameMode == "Elimination") ? GameMode::ELIMINATION : GameMode::SCORING;
 
-            db << "SELECT question_id, user_id, selected_option, is_correct, response_time_ms, unixepoch(timestamp) "
-              "FROM game_log WHERE session_id = ? ORDER BY id ASC" << req->session_id
-           >> [&](uint32_t qid, uint32_t uid, uint8_t opt, bool correct, uint32_t resp_time, uint64_t timestamp) {
-              if (response.event_count < 10000) {
-                  auto& event = response.events[response.event_count++];
-                  event.question_id = qid;
-                  event.user_id = uid;
-                  event.selected_option = opt;
-                  event.is_correct = correct;
-                  event.response_time_ms = resp_time;
-                  event.timestamp_ms = timestamp * 1000; 
-              }
-           };
-        response.status = StatusCode::SUCCESS;
+            db << "SELECT gl.question_id, gl.user_id, gl.selected_option, gl.is_correct, gl.response_time_ms, "
+                      "unixepoch(gl.timestamp), q.content, q.option1, q.option2, q.option3, q.option4, "
+                      "q.correct_option, q.difficulty "
+                 "FROM game_log gl "
+                 "JOIN questions q ON gl.question_id = q.id "
+                 "WHERE gl.session_id = ? ORDER BY gl.id ASC" 
+               << req->session_id
+               >> [&](uint32_t qid, uint32_t uid, uint8_t opt, bool correct, uint32_t resp_time, 
+                     uint64_t timestamp, const std::string& content, const std::string& opt1, 
+                     const std::string& opt2, const std::string& opt3, const std::string& opt4,
+                     int correct_opt, int difficulty) {
+                  if (response.event_count < 10000) {
+                      auto& event = response.events[response.event_count++];
+                      event.question_id = qid;
+                      event.user_id = uid;
+                      event.selected_option = opt;
+                      event.is_correct = correct;
+                      event.response_time_ms = resp_time;
+                      event.timestamp_ms = timestamp * 1000;
+                      event.correct_option = static_cast<uint8_t>(correct_opt);
+                      event.difficulty = static_cast<uint8_t>(difficulty);
+                      
+                      strncpy(event.question_content, content.c_str(), MAX_QUESTION_CONTENT_LEN - 1);
+                      event.question_content[MAX_QUESTION_CONTENT_LEN - 1] = '\0';
+                      
+                      strncpy(event.options[0], opt1.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                      event.options[0][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+                      strncpy(event.options[1], opt2.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                      event.options[1][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+                      strncpy(event.options[2], opt3.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                      event.options[2][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+                      strncpy(event.options[3], opt4.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                      event.options[3][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+                  }
+               };
+            response.status = StatusCode::SUCCESS;
         }
         sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
     } catch (std::exception &e) {
-        std::cerr << "DB Error getting replay" << e.what() << std::endl;
+        std::cerr << "DB Error getting replay: " << e.what() << std::endl;
+    }
+}
+
+void ClientSession::handleGetGameHistory() {
+    GameHistoryResponse response{};
+    response.status = StatusCode::SUCCESS;
+    response.entry_count = 0;
+
+    try {
+        auto &db = DatabaseManager::getInstance().getDb();
+
+        db << "SELECT sp.session_id, gs.game_mode, sp.score, sp.rank, "
+                  "IFNULL(SUM(CASE WHEN gl.is_correct = 1 THEN 1 ELSE 0 END), 0), "
+                  "COUNT(DISTINCT gl.question_id), "
+                  "IFNULL(AVG(gl.response_time_ms), 0), "
+                  "unixepoch(gs.created_at) "
+              "FROM session_participants sp "
+              "JOIN game_sessions gs ON sp.session_id = gs.id "
+              "LEFT JOIN game_log gl ON sp.session_id = gl.session_id AND sp.user_id = gl.user_id "
+              "WHERE sp.user_id = ? "
+              "GROUP BY sp.session_id, gs.created_at "
+              "ORDER BY gs.created_at DESC "
+              "LIMIT 100"
+           << state.userId
+           >> [&](uint32_t sid, const std::string& mode, uint32_t score, int rank,
+                  int correct, int total, double avg_time, uint64_t timestamp) {
+               if (response.entry_count < 100) {
+                   auto& entry = response.entries[response.entry_count++];
+                   entry.session_id = sid;
+                   entry.player_score = score;
+                   entry.player_rank = (rank > 0) ? rank : 0;
+                   entry.correct_answers = correct;
+                   entry.total_questions = total;
+                   entry.avg_response_time_ms = static_cast<uint32_t>(avg_time);
+                   entry.timestamp_sec = timestamp;
+                   
+                   strncpy(entry.game_mode, mode.c_str(), sizeof(entry.game_mode) - 1);
+                   entry.game_mode[sizeof(entry.game_mode) - 1] = '\0';
+               }
+           };
+
+        sendResponse(MessageType::S2C_GET_GAME_HISTORY_RSP, &response, sizeof(response));
+    } catch (const std::exception &e) {
+        std::cerr << "DB Error getting game history: " << e.what() << std::endl;
+        response.status = StatusCode::FAILURE_GENERIC;
+        sendResponse(MessageType::S2C_GET_GAME_HISTORY_RSP, &response, sizeof(response));
     }
 }

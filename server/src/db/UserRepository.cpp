@@ -5,8 +5,9 @@
 
 UserStatsResponse UserRepository::getUserStats(uint32_t userId) {
     UserStatsResponse stats{};
-    // Default ranked points if no record found
     stats.ranked_points = 1000;
+    stats.total_ranked_players = 0;
+    stats.player_rank = 0;
 
     auto fillModeStats = [&](const std::string& mode, UserModeStats& out) {
         out.total_matches = 0;
@@ -59,6 +60,15 @@ UserStatsResponse UserRepository::getUserStats(uint32_t userId) {
 
         fillModeStats("Elimination", stats.elimination);
         fillModeStats("Scoring", stats.scoring);
+
+        db << "SELECT COUNT(*) FROM users WHERE ranked_points > 0"
+           >> stats.total_ranked_players;
+
+        db << "SELECT COUNT(*) FROM users WHERE ranked_points > ?"
+           << stats.ranked_points
+           >> stats.player_rank;
+        
+        stats.player_rank += 1;
     } catch (const std::exception &e) {
         std::cerr << "DB Error getting stats: " << e.what() << std::endl;
     }

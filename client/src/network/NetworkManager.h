@@ -33,6 +33,7 @@ public:
     void sendPauseGame();
     void sendResumeGame();
     void sendGetReplay(uint32_t sessionId);
+    void sendGetGameHistory();
     
 signals:
     // Connection signals
@@ -66,6 +67,7 @@ signals:
     void returnToRoomResponse(StatusCode code);
     void statsResponse(const UserStatsResponse& stats);
     void replayDataResponse(StatusCode status, uint32_t sessionId, GameMode mode, const QVector<ReplayEvent>& events);
+    void gameHistoryResponse(StatusCode status, const QVector<GameHistoryEntry>& entries);
     void errorResponse(StatusCode code, const QString& message);
     
 private slots:

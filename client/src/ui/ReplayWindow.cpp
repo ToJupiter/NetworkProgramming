@@ -116,11 +116,24 @@ void ReplayWindow::displayCurrentEvent() {
     }
     
     const auto& event = events[currentEventIndex];
-    ui->lblEventInfo->setText(QString("Event %1 / %2: Question %3 - User answered option %4 in %5ms")
+    
+    QString difficultyStr;
+    if (event.difficulty == 1) difficultyStr = "Easy";
+    else if (event.difficulty == 2) difficultyStr = "Medium";
+    else if (event.difficulty == 3) difficultyStr = "Hard";
+    else difficultyStr = "Unknown";
+    
+    QString correctOptionStr = QString("Option %1").arg(QChar('A' + event.correct_option - 1));
+    QString selectedOptionStr = QString("Option %1").arg(QChar('A' + event.selected_option - 1));
+    bool isCorrect = (event.selected_option == event.correct_option);
+    
+    ui->lblEventInfo->setText(QString("Event %1 / %2 - %3 (%4) - Answered: %5 (Correct: %6) - %7ms")
         .arg(currentEventIndex + 1)
         .arg(events.size())
-        .arg(event.question_id)
-        .arg(event.selected_option)
+        .arg(QString::fromUtf8(event.question_content, strlen(event.question_content)))
+        .arg(difficultyStr)
+        .arg(selectedOptionStr)
+        .arg(isCorrect ? "✓" : "✗")
         .arg(event.response_time_ms));
     
     ui->lstEvents->setCurrentRow(currentEventIndex);

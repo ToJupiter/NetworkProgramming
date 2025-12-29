@@ -2,6 +2,7 @@
 #include "ui_MainMenuWindow.h"
 #include "LobbyWindow.h"
 #include "ReplayWindow.h"
+#include "GameHistoryWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 #include <QMessageBox>
@@ -19,6 +20,7 @@ MainMenuWindow::MainMenuWindow(QWidget* parent)
     connect(ui->btnPlay, &QPushButton::clicked, this, &MainMenuWindow::onPlayClicked);
     connect(ui->btnViewStats, &QPushButton::clicked, this, &MainMenuWindow::onViewStatsClicked);
     connect(ui->btnReplay, &QPushButton::clicked, this, &MainMenuWindow::onReplayClicked);
+    connect(ui->btnGameHistory, &QPushButton::clicked, this, &MainMenuWindow::onGameHistoryClicked);
     
     connect(networkManager, &NetworkManager::statsResponse,
             this, &MainMenuWindow::onStatsReceived);
@@ -28,6 +30,7 @@ MainMenuWindow::MainMenuWindow(QWidget* parent)
     ui->btnPlay->setStyleSheet("background:#27ae60; color:white; font-weight:bold; font-size:14px;");
     ui->btnViewStats->setStyleSheet("background:#3498db; color:white; font-weight:bold; font-size:14px;");
     ui->btnReplay->setStyleSheet("background:#9b59b6; color:white; font-weight:bold; font-size:14px;");
+    ui->btnGameHistory->setStyleSheet("background:#e67e22; color:white; font-weight:bold; font-size:14px;");
     
     loadStats();
 }
@@ -56,16 +59,27 @@ void MainMenuWindow::onStatsReceived(const UserStatsResponse& stats) {
 }
 
 void MainMenuWindow::displayStats(const UserStatsResponse& stats) {
+    double percentile = 0.0;
+    if (stats.total_ranked_players > 0) {
+        percentile = (100.0 * (stats.total_ranked_players - stats.player_rank)) / stats.total_ranked_players;
+    }
+    
+    QString tierName = getTierName(stats.ranked_points);
+    QString rankText = QString("%1, %2th percentile").arg(stats.player_rank).arg(percentile, 0, 'f', 1);
+    
     QString statsText = QString(
-        "<b>%1</b><br><br>"
-        "<b>Ranked Points:</b> %2<br><br>"
+        "<b>%1</b><br>"
+        "<b>%2</b> - %3<br><br>"
+        "<b>Ranked Points:</b> %4<br><br>"
         "<b>Elimination Mode:</b><br>"
-        "Matches: %3 | Wins: %4 | High Score: %5<br>"
-        "Accuracy: %6%<br><br>"
+        "Matches: %5 | Wins: %6 | High Score: %7<br>"
+        "Accuracy: %8%<br><br>"
         "<b>Scoring Mode:</b><br>"
-        "Matches: %7 | Wins: %8 | High Score: %9<br>"
-        "Accuracy: %10%"
+        "Matches: %9 | Wins: %10 | High Score: %11<br>"
+        "Accuracy: %12%"
     ).arg(SessionState::instance().getDisplayName())
+     .arg(tierName)
+     .arg(rankText)
      .arg(stats.ranked_points)
      .arg(stats.elimination.total_matches)
      .arg(stats.elimination.wins)
@@ -122,6 +136,19 @@ void MainMenuWindow::onReplayClicked() {
     }
 }
 
+void MainMenuWindow::onGameHistoryClicked() {
+    GameHistoryWindow* historyWindow = new GameHistoryWindow(this);
+    historyWindow->show();
+}
+
 void MainMenuWindow::onConnectionError(const QString& error) {
     QMessageBox::critical(this, "Connection Error", error);
+}
+
+QString MainMenuWindow::getTierName(uint32_t rankedPoints) const {
+    if (rankedPoints >= 2400) return "Diamond";
+    if (rankedPoints >= 2000) return "Platinum";
+    if (rankedPoints >= 1600) return "Gold";
+    if (rankedPoints >= 1200) return "Silver";
+    return "Bronze";
 }

@@ -35,6 +35,7 @@ set(SOURCES
     src/ui/RoomWindow.cpp
     src/ui/GameWindow.cpp
     src/ui/ReplayWindow.cpp
+    src/ui/GameHistoryWindow.cpp
     src/ui/StatsWindow.cpp
     src/models/SessionState.cpp
     src/models/GameState.cpp
@@ -51,6 +52,7 @@ set(HEADERS
     src/ui/RoomWindow.h
     src/ui/GameWindow.h
     src/ui/ReplayWindow.h
+    src/ui/GameHistoryWindow.h
     src/ui/StatsWindow.h
     src/models/SessionState.h
     src/models/GameState.h
@@ -65,6 +67,7 @@ set(UI_FILES
     src/ui/RoomWindow.ui
     src/ui/GameWindow.ui
     src/ui/ReplayWindow.ui
+    src/ui/GameHistoryWindow.ui
     src/ui/StatsWindow.ui
 )
 

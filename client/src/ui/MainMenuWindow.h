@@ -22,12 +22,14 @@ private slots:
     void onPlayClicked();
     void onViewStatsClicked();
     void onReplayClicked();
+    void onGameHistoryClicked();
     void onConnectionError(const QString& error);
     void loadStats();
 
 private:
     void setupUI();
     void displayStats(const UserStatsResponse& stats);
+    QString getTierName(uint32_t rankedPoints) const;
 
     Ui::MainMenuWindow* ui;
     NetworkManager* networkManager;

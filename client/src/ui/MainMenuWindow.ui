@@ -71,7 +71,7 @@
      </spacer>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="layoutButtons" stretch="1,1,1">
+     <layout class="QHBoxLayout" name="layoutButtons" stretch="1,1,1,1">
       <item>
        <widget class="QPushButton" name="btnPlay">
         <property name="text">
@@ -102,6 +102,19 @@
        <widget class="QPushButton" name="btnReplay">
         <property name="text">
          <string>Watch Replay</string>
+        </property>
+        <property name="minimumHeight">
+         <number>60</number>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">font-size: 14px; font-weight: bold;</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnGameHistory">
+        <property name="text">
+         <string>Game History</string>
         </property>
         <property name="minimumHeight">
          <number>60</number>

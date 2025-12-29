@@ -153,6 +153,10 @@ void NetworkManager::sendGetReplay(uint32_t sessionId) {
     sendMessage(MessageType::C2S_GET_REPLAY_REQ, ProtocolHelper::packStruct(req));
 }
 
+void NetworkManager::sendGetGameHistory() {
+    sendMessage(MessageType::C2S_GET_GAME_HISTORY_REQ, QByteArray());
+}
+
 // === Socket Event Handlers ===
 
 void NetworkManager::onConnected() {
@@ -363,6 +367,16 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
                 events.append(resp.events[i]);
             }
             emit replayDataResponse(resp.status, resp.session_id, resp.game_mode, events);
+            break;
+        }
+        
+        case MessageType::S2C_GET_GAME_HISTORY_RSP: {
+            auto resp = ProtocolHelper::unpackStruct<GameHistoryResponse>(body);
+            QVector<GameHistoryEntry> entries;
+            for (uint32_t i = 0; i < resp.entry_count && i < 100; ++i) {
+                entries.append(resp.entries[i]);
+            }
+            emit gameHistoryResponse(resp.status, entries);
             break;
         }
         

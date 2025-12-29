@@ -13,6 +13,75 @@
 
 ---
 # Final changes in client and server
-1. The replay functionality is having some problems due to the server, protocol and maybe SQL error in handling. While the client will be displaying the questions in the replay session (meaning it will display the questions, along with 4 answers of the questions). The server and the protocol is missing on the return of all questions metadata and answers, making the information not enough to render a well done replay.
-2. When we log out, please route to the login/register screen. Do not disconnect the client immediately. When we leave a room, also route us to the main screen, the homepage that you implemented.
+## Requirements:
+1. Focus on clean code, beautiful code, strong code structure both in client and server (if any changes is needed). For server, try as much as you can not to touch it, but rather focus on the client code. The server code is already quite complete and clean, so try not to touch it as much as you do with the client code. For client, refractoring for cleanliness is needed rigorously, especially when touching socket programming components (this is the main part of our project).
 
+
+## Implementation:
+1. The replay functionality is having some problems due to the server, protocol and maybe SQL error in handling. While the client will be displaying the questions in the replay session (meaning it will display the questions, along with 4 answers of the questions). The server and the protocol is missing on the return of all questions metadata and answers, making the information not enough to render a well done replay. Please have a look at the server-side implementation, since it is only doing game_log table. It should also take the questions table into account.
+2. When we log out, please route to the login/register screen. Do not disconnect the client immediately. When we leave a room, also route us to the mainmenuwindow, the homepage that you implemented.
+3. For the ranked points system, maybe we should do some revamps in both client and server. For instance, we should be displaying which percentile that person is ranked on the table, and like their #top (like #1, 99.9 percentile). And also we have a ranking system here:
+**Tier Thresholds:**
+- **Bronze:** 0-1199 RP
+- **Silver:** 1200-1599 RP
+- **Gold:** 1600-1999 RP
+- **Platinum:** 2000-2399 RP
+- **Diamond:** 2400+ RP
+Implement it. 
+4. Also implement of a very important functionality, the Game History for each user. This needs coordination in both the server-side and the client-side. The Game History queries the database for games that a player played and their stats when they played the game:
+- number of right answer, average response time: game_log table in database 
+- the score they gained during the game, their rank: session_participants table
+- game-mode of that game: game_sessions table.
+This Game History will add another button on the MainMenu window of the game. Focus on making it right and beautiful.
+
+# Client Refactoring and Server Enhancements for Quiz Game Platform
+
+## Project Context
+We have a multiplayer quiz game platform with:
+- **Server**: C++ with SQLite
+- **Client**: C++ with Qt. Client and server connects using POSIX socket.
+- **Database tables**: `users`, `questions`, `game_sessions`, `session_participants`, `game_log`
+- **Current features**: Real-time multiplayer, ranked games, replay functionality (partially working)
+
+## Specific Requirements
+
+### 1. Replay Functionality Fix
+**Problem**: Client displays questions in replay session but server/protocol returns insufficient data from only `game_log` table.
+**Solution**: Enhance server-side to include questions metadata from `questions` table alongside game logs from `game_log`. Update protocol to return:
+- Question content, options (1-4), correct answer, difficulty
+- User's selected answer and response time for each question
+- Game session metadata (mode, timestamp, participants)
+Update the client also to fit with the changes in the server.
+
+### 2. Navigation & Routing
+When we end a game, the Room only displays a button `Leave Room`. When we press this button, client immediately disconnected. This is not good. When we press this button, it should route us to the `MainMenuWindow`. 
+- **Logout**: Route to login/register screen without immediate client disconnection
+- **Leave Room**: Route to `MainMenuWindow` (homepage)
+
+### 3. Ranked Points System Revamp
+Implement tier system with RP thresholds:
+- **Bronze**: 0-1199 RP
+- **Silver**: 1200-1599 RP  
+- **Gold**: 1600-1999 RP
+- **Platinum**: 2000-2399 RP
+- **Diamond**: 2400+ RP
+
+**Display enhancements**:
+- Show percentile ranking (e.g., "#1, 99.9th percentile")
+- Calculate percentile based on all ranked players
+
+### 4. Game History Feature
+**New button** on `MainMenuWindow` to view player's game history.
+
+**Server-side**: New endpoint to query combined data from:
+- `game_log`: Number of correct answers, average response time
+- `session_participants`: Score gained, final rank in session
+- `game_sessions`: Game mode (scoring/elimination), timestamp.
+
+**Client-side**: Clean, responsive UI displaying:
+- Game date/time, mode, score, rank, correct answers, avg response time
+
+### 5. Code Quality Focus
+- **Client**: Minimal changes, clean code.
+- **Server**: Minimal changes; focus on query optimization and clean endpoints
+- **Structure**: Maintain strong separation of concerns, clean interfaces. THIS IS IMPORTANT: CLEAN CODE MEANS NO COMMENTS ARE ALLOWED IN CODE. EVERY BLOCK OF CODE MUST BE WRITTEN CLEANLY FROM THE START, IT DOES NOT NEED COMMENTS. THE NEWLY GENERATED CODE MUST ALSO BLENDS IN WITH THE EXISTING CODE, WITH THE SAME STYLE AND SAME FUNCTIONAL DESIGN. MUST BE COMPATIBLE AND ACCLIMATED WITH THE EXISTING CODE.

@@ -55,6 +55,9 @@ enum class MessageType : uint16_t {
     C2S_GET_REPLAY_REQ,
     S2C_GET_REPLAY_RSP,
 
+    C2S_GET_GAME_HISTORY_REQ,
+    S2C_GET_GAME_HISTORY_RSP,
+
     S2C_ERROR_RSP
 };
 
@@ -245,6 +248,8 @@ struct UserStatsResponse {
     UserModeStats elimination;
     UserModeStats scoring;
     uint32_t ranked_points;
+    uint32_t total_ranked_players;
+    uint32_t player_rank;
 };
 
 struct GetReplayRequest {
@@ -258,6 +263,10 @@ struct ReplayEvent {
     uint8_t selected_option;
     bool is_correct;
     uint32_t response_time_ms;
+    char question_content[MAX_QUESTION_CONTENT_LEN];
+    char options[4][MAX_OPTION_CONTENT_LEN];
+    uint8_t correct_option;
+    uint8_t difficulty;
 };
 
 struct ReplayDataResponse {
@@ -266,6 +275,23 @@ struct ReplayDataResponse {
     GameMode game_mode;
     uint32_t event_count;
     ReplayEvent events[10000];
+};
+
+struct GameHistoryEntry {
+    uint32_t session_id;
+    char game_mode[16];
+    uint32_t player_score;
+    uint32_t player_rank;
+    uint32_t correct_answers;
+    uint32_t total_questions;
+    uint32_t avg_response_time_ms;
+    uint64_t timestamp_sec;
+};
+
+struct GameHistoryResponse {
+    StatusCode status;
+    uint32_t entry_count;
+    GameHistoryEntry entries[100];
 };
 
 struct PauseGameRequest {
