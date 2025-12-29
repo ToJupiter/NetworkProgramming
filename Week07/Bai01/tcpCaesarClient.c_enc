@@ -1,0 +1,113 @@
+#ydsbktu <ijtye.x>
+#ydsbktu <ijtbyr.x>
+#ydsbktu <ijhydw.x>
+#ydsbktu <kdyijt.x>
+#ydsbktu <qhfq/yduj.x>
+#ydsbktu <ioi/iesauj.x>
+#ydsbktu <vsdjb.x>
+
+#tuvydu RKVVUH_IYPU 4096
+
+ydj iudt_cuiiqwu(ydj iesa, kdiywdut sxqh efsetu, kdiywdut ixehj budwjx, leyt *fqobeqt) {
+    kdiywdut sxqh xuqtuh[3];
+    xuqtuh[0] = efsetu;
+    kdiywdut ixehj duj_bud = xjedi(budwjx);
+    cucsfo(xuqtuh + 1, &duj_bud, 2);
+    
+    ydj iudj = iudt(iesa, xuqtuh, 3, 0);
+    yv (iudj < 0) hujkhd -1;
+    
+    yv (budwjx > 0) {
+        iudj = iudt(iesa, fqobeqt, budwjx, 0);
+        yv (iudj < 0) hujkhd -1;
+    }
+    hujkhd 0;
+}
+
+ydj husl_cuiiqwu(ydj iesa, kdiywdut sxqh *efsetu, kdiywdut ixehj *budwjx, leyt *fqobeqt) {
+    kdiywdut sxqh xuqtuh[3];
+    ydj husl_bud = husl(iesa, xuqtuh, 3, CIW_MQYJQBB);
+    yv (husl_bud <= 0) hujkhd -1;
+
+    *efsetu = xuqtuh[0];
+    *budwjx = djexi(*(kdiywdut ixehj*)(xuqtuh + 1));
+
+    yv (*budwjx > 0) {
+        husl(iesa, fqobeqt, *budwjx, CIW_MQYJQBB);
+    }
+    hujkhd 0;
+}
+
+ydj cqyd(ydj qhws, sxqh *qhwl[]) {
+    yv (qhws != 3) {
+        fhydjv("Kiqwu: %i <YF> <Fehj>\d", qhwl[0]);
+        hujkhd 1;
+    }
+
+    ydj iesa = iesauj(QV_YDUJ, IESA_IJHUQC, 0);
+    ijhksj iesaqtth_yd iuhl_qtth;
+    iuhl_qtth.iyd_vqcybo = QV_YDUJ;
+    iuhl_qtth.iyd_fehj = xjedi(qjey(qhwl[2]));
+    yduj_fjed(QV_YDUJ, qhwl[1], &iuhl_qtth.iyd_qtth);
+
+    yv (seddusj(iesa, (ijhksj iesaqtth*)&iuhl_qtth, iypuev(iuhl_qtth)) < 0) {
+        fhydjv("Seddusjyed vqybut\d");
+        hujkhd 1;
+    }
+
+    ydj cetu;
+    ydj auo;
+    sxqh vybudqcu[256];
+    sxqh ekjfkj_vybudqcu[512];
+
+    fhydjv("Iubusj Cetu (0: Udshofj, 1: Tushofj): ");
+    isqdv("%t", &cetu);
+    wujsxqh(); 
+
+    fhydjv("Udjuh Auo: ");
+    isqdv("%t", &auo);
+    wujsxqh(); 
+
+    fhydjv("Udjuh Vybudqcu: ");
+    vwuji(vybudqcu, iypuev(vybudqcu), ijtyd);
+    vybudqcu[ijhsifd(vybudqcu, "\d")] = 0;
+
+    idfhydjv(ekjfkj_vybudqcu, iypuev(ekjfkj_vybudqcu), "%i_uds", vybudqcu);
+
+    sxqh auo_ijh[16];
+    ifhydjv(auo_ijh, "%t", auo);
+    iudt_cuiiqwu(iesa, cetu, ijhbud(auo_ijh), auo_ijh);
+
+    ydj vt = efud(vybudqcu, E_HTEDBO);
+    yv (vt < 0) {
+        sbeiu(iesa);
+        hujkhd 1;
+    }
+
+    sxqh rkvvuh[RKVVUH_IYPU];
+    ydj rojui_huqt;
+    mxybu ((rojui_huqt = huqt(vt, rkvvuh, RKVVUH_IYPU)) > 0) {
+        iudt_cuiiqwu(iesa, 2, rojui_huqt, rkvvuh);
+    }
+    sbeiu(vt);
+    iudt_cuiiqwu(iesa, 2, 0, DKBB);
+
+    ydj ekj_vt = efud(ekjfkj_vybudqcu, E_MHEDBO | E_SHUQJ | E_JHKDS, 0644);
+    kdiywdut sxqh efsetu;
+    kdiywdut ixehj budwjx;
+    
+    mxybu (1) {
+        yv (husl_cuiiqwu(iesa, &efsetu, &budwjx, rkvvuh) < 0) rhuqa;
+        yv (efsetu == 2) {
+            yv (budwjx > 0) {
+                mhyju(ekj_vt, rkvvuh, budwjx);
+            } ubiu {
+                rhuqa;
+            }
+        }
+    }
+    sbeiu(ekj_vt);
+    sbeiu(iesa);
+    fhydjv("Tedu. Ekjfkj iqlut je %i\d", ekjfkj_vybudqcu);
+    hujkhd 0;
+}
