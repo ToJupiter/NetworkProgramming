@@ -1,5 +1,5 @@
-#include "GameWindow.h"
 #include "ui_GameWindow.h"
+#include "GameWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 
@@ -92,6 +92,8 @@ void GameWindow::bindSignals() {
     connect(ui->btnOptionB, &QPushButton::clicked, this, &GameWindow::onOptionBClicked);
     connect(ui->btnOptionC, &QPushButton::clicked, this, &GameWindow::onOptionCClicked);
     connect(ui->btnOptionD, &QPushButton::clicked, this, &GameWindow::onOptionDClicked);
+    connect(ui->btnPauseGame, &QPushButton::clicked, this, &GameWindow::onPauseGameClicked);
+    connect(ui->btnResumeGame, &QPushButton::clicked, this, &GameWindow::onResumeGameClicked);
 
     // Network signals
     connect(networkManager, &NetworkManager::questionNotif,
@@ -123,6 +125,18 @@ void GameWindow::setButtonsEnabled(bool enabled) {
     ui->btnOptionB->setEnabled(enabled && !paused);
     ui->btnOptionC->setEnabled(enabled && !paused);
     ui->btnOptionD->setEnabled(enabled && !paused);
+}
+
+void GameWindow::onPauseGameClicked() {
+    if (!paused && hostUserId == sessionState->getUserId()) {
+        networkManager->sendPauseGame();
+    }
+}
+
+void GameWindow::onResumeGameClicked() {
+    if (paused && hostUserId == sessionState->getUserId()) {
+        networkManager->sendResumeGame();
+    }
 }
 
 void GameWindow::startQuestion(uint32_t questionId, const QString& content,
@@ -311,11 +325,15 @@ void GameWindow::onGamePaused() {
     stopQuestionTimer();
     setButtonsEnabled(false);
     ui->lblGameStatus->setText("Game paused");
+    ui->btnPauseGame->setVisible(false);
+    ui->btnResumeGame->setVisible(true);
 }
 
 void GameWindow::onGameResumed() {
     paused = false;
     ui->lblGameStatus->clear();
+    ui->btnPauseGame->setVisible(true);
+    ui->btnResumeGame->setVisible(false);
     if (questionActive && timeRemainingSec > 0) {
         setButtonsEnabled(true);
         questionTimer->start();

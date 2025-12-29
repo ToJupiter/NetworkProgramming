@@ -3,7 +3,7 @@
 #include <QMainWindow>
 #include "protocol.h"
 
-class LobbyWindow;
+class MainMenuWindow;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class LoginWindow; }
@@ -34,5 +34,5 @@ private:
     void clearError();
     
     Ui::LoginWindow *ui;
-    LobbyWindow *lobbyWindow;
+    MainMenuWindow *mainMenuWindow;
 };

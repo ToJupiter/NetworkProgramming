@@ -1,6 +1,7 @@
 #include "NetworkManager.h"
 #include "ProtocolHelper.h"
 #include <QDebug>
+#include <poll.h>
 
 NetworkManager& NetworkManager::instance() {
     static NetworkManager inst;
@@ -9,38 +10,44 @@ NetworkManager& NetworkManager::instance() {
 
 NetworkManager::NetworkManager()
     : QObject(nullptr)
-    , m_socket(new QTcpSocket(this))
+    , m_socket(std::make_unique<PosixSocketClient>())
+    , m_ioTimer(new QTimer(this))
 {
-    connect(m_socket, &QTcpSocket::connected, this, &NetworkManager::onConnected);
-    connect(m_socket, &QTcpSocket::disconnected, this, &NetworkManager::onDisconnected);
-    connect(m_socket, &QTcpSocket::readyRead, this, &NetworkManager::onReadyRead);
-    connect(m_socket, &QTcpSocket::errorOccurred,
-            this, &NetworkManager::onSocketError);
+    connect(m_ioTimer, &QTimer::timeout, this, &NetworkManager::onIOReady);
+    m_ioTimer->setInterval(50);
 }
 
 NetworkManager::~NetworkManager() {
-    if (m_socket->state() == QAbstractSocket::ConnectedState) {
-        m_socket->disconnectFromHost();
+    if (m_socket && m_socket->isConnected()) {
+        m_socket->disconnect();
+    }
+    if (m_ioTimer) {
+        m_ioTimer->stop();
     }
 }
 
 bool NetworkManager::connectToServer(const QString& host, quint16 port) {
-    if (m_socket->state() == QAbstractSocket::ConnectedState) {
+    if (m_socket->isConnected()) {
         return true;
     }
     
-    m_socket->connectToHost(host, port);
-    return m_socket->waitForConnected(5000);
+    if (m_socket->connect(host.toStdString(), port)) {
+        m_ioTimer->start();
+        onConnected();
+        return true;
+    }
+    return false;
 }
 
 void NetworkManager::disconnectFromServer() {
-    if (m_socket->state() == QAbstractSocket::ConnectedState) {
-        m_socket->disconnectFromHost();
+    if (m_socket && m_socket->isConnected()) {
+        m_socket->disconnect();
+        m_ioTimer->stop();
     }
 }
 
 bool NetworkManager::isConnected() const {
-    return m_socket->state() == QAbstractSocket::ConnectedState;
+    return m_socket && m_socket->isConnected();
 }
 
 void NetworkManager::sendMessage(MessageType type, const QByteArray& body) {
@@ -50,8 +57,9 @@ void NetworkManager::sendMessage(MessageType type, const QByteArray& body) {
     }
     
     QByteArray message = ProtocolHelper::createMessage(type, body);
-    m_socket->write(message);
-    m_socket->flush();
+    if (!m_socket->send(reinterpret_cast<const uint8_t*>(message.constData()), message.size())) {
+        qWarning() << "Failed to send message";
+    }
 }
 
 // === Message Senders ===
@@ -138,6 +146,13 @@ void NetworkManager::sendResumeGame() {
     sendMessage(MessageType::C2S_RESUME_GAME_REQ, QByteArray());
 }
 
+void NetworkManager::sendGetReplay(uint32_t sessionId) {
+    GetReplayRequest req;
+    req.session_id = sessionId;
+    
+    sendMessage(MessageType::C2S_GET_REPLAY_REQ, ProtocolHelper::packStruct(req));
+}
+
 // === Socket Event Handlers ===
 
 void NetworkManager::onConnected() {
@@ -148,18 +163,40 @@ void NetworkManager::onConnected() {
 void NetworkManager::onDisconnected() {
     qDebug() << "Disconnected from server";
     m_recvBuffer.clear();
+    m_ioTimer->stop();
     emit disconnected();
 }
 
 void NetworkManager::onReadyRead() {
-    m_recvBuffer.append(m_socket->readAll());
-    processBuffer();
+    uint8_t buffer[4096];
+    int n = m_socket->recv(buffer, sizeof(buffer));
+    if (n > 0) {
+        m_recvBuffer.append(reinterpret_cast<char*>(buffer), n);
+        processBuffer();
+    } else if (n == -1) {
+        onDisconnected();
+    }
 }
 
-void NetworkManager::onSocketError(QAbstractSocket::SocketError error) {
-    QString errorMsg = m_socket->errorString();
-    qWarning() << "Socket error:" << error << errorMsg;
-    emit connectionError(errorMsg);
+void NetworkManager::onSocketError(const QString& error) {
+    qWarning() << "Socket error:" << error;
+    emit connectionError(error);
+}
+
+void NetworkManager::onIOReady() {
+    if (!isConnected()) {
+        onDisconnected();
+        return;
+    }
+    
+    struct pollfd pfd;
+    pfd.fd = m_socket->getFd();
+    pfd.events = POLLIN;
+    
+    int ret = poll(&pfd, 1, 0);
+    if (ret > 0 && (pfd.revents & POLLIN)) {
+        onReadyRead();
+    }
 }
 
 void NetworkManager::processBuffer() {
@@ -319,6 +356,16 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
             break;
         }
         
+        case MessageType::S2C_GET_REPLAY_RSP: {
+            auto resp = ProtocolHelper::unpackStruct<ReplayDataResponse>(body);
+            QVector<ReplayEvent> events;
+            for (uint32_t i = 0; i < resp.event_count && i < 10000; ++i) {
+                events.append(resp.events[i]);
+            }
+            emit replayDataResponse(resp.status, resp.session_id, resp.game_mode, events);
+            break;
+        }
+        
         case MessageType::S2C_ERROR_RSP: {
             auto resp = ProtocolHelper::unpackStruct<ErrorResponse>(body);
             QString msg = ProtocolHelper::fromFixedArray(resp.message, MAX_ERROR_MSG_LEN);
@@ -329,5 +376,11 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         default:
             qWarning() << "Unknown message type:" << static_cast<uint16_t>(type);
             break;
+    }
+}
+
+void NetworkManager::pumpEvents() {
+    if (isConnected()) {
+        onIOReady();
     }
 }

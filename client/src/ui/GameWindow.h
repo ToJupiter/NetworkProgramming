@@ -41,6 +41,8 @@ private slots:
     void onOptionDClicked();
     void onQuestionTick();
     void onReturnedToRoom();
+    void onPauseGameClicked();
+    void onResumeGameClicked();
 
 private:
     void setupUiTheme();

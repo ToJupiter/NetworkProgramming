@@ -1,6 +1,5 @@
 #include "ProtocolHelper.h"
 
-// Linux/WSL: use POSIX networking byte order functions
 #include <arpa/inet.h>
 
 QByteArray ProtocolHelper::createMessage(MessageType type, const QByteArray& body) {
@@ -23,7 +22,6 @@ void ProtocolHelper::copyToFixedArray(char* dest, int maxLen, const QString& src
 }
 
 QString ProtocolHelper::fromFixedArray(const char* src, int maxLen) {
-    // Find actual string length (up to null terminator or maxLen)
     int len = 0;
     while (len < maxLen && src[len] != '\0') {
         len++;

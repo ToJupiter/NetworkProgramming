@@ -27,11 +27,14 @@ set(SOURCES
     src/main.cpp
     src/network/NetworkManager.cpp
     src/network/ProtocolHelper.cpp
+    src/network/PosixSocketClient.cpp
     src/ui/LoginWindow.cpp
+    src/ui/MainMenuWindow.cpp
     src/ui/LobbyWindow.cpp
     src/ui/CreateRoomDialog.cpp
     src/ui/RoomWindow.cpp
     src/ui/GameWindow.cpp
+    src/ui/ReplayWindow.cpp
     src/ui/StatsWindow.cpp
     src/models/SessionState.cpp
     src/models/GameState.cpp
@@ -40,11 +43,14 @@ set(SOURCES
 set(HEADERS
     src/network/NetworkManager.h
     src/network/ProtocolHelper.h
+    src/network/PosixSocketClient.h
     src/ui/LoginWindow.h
+    src/ui/MainMenuWindow.h
     src/ui/LobbyWindow.h
     src/ui/CreateRoomDialog.h
     src/ui/RoomWindow.h
     src/ui/GameWindow.h
+    src/ui/ReplayWindow.h
     src/ui/StatsWindow.h
     src/models/SessionState.h
     src/models/GameState.h
@@ -53,10 +59,12 @@ set(HEADERS
 
 set(UI_FILES
     src/ui/LoginWindow.ui
+    src/ui/MainMenuWindow.ui
     src/ui/LobbyWindow.ui
     src/ui/CreateRoomDialog.ui
     src/ui/RoomWindow.ui
     src/ui/GameWindow.ui
+    src/ui/ReplayWindow.ui
     src/ui/StatsWindow.ui
 )
 
@@ -66,7 +74,4 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})
 target_link_libraries(${PROJECT_NAME}
     ${QT_PACKAGE}::Core
     ${QT_PACKAGE}::Widgets
-    ${QT_PACKAGE}::Network
 )
-
-# On Linux/WSL, no extra system libs needed for Qt networking

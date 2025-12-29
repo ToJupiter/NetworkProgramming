@@ -1,9 +1,11 @@
 #pragma once
 
 #include <QObject>
-#include <QTcpSocket>
 #include <QByteArray>
+#include <QTimer>
+#include <memory>
 #include "protocol.h"
+#include "PosixSocketClient.h"
 
 class NetworkManager : public QObject {
     Q_OBJECT
@@ -30,6 +32,7 @@ public:
     void sendGetStats();
     void sendPauseGame();
     void sendResumeGame();
+    void sendGetReplay(uint32_t sessionId);
     
 signals:
     // Connection signals
@@ -62,13 +65,15 @@ signals:
     
     void returnToRoomResponse(StatusCode code);
     void statsResponse(const UserStatsResponse& stats);
+    void replayDataResponse(StatusCode status, uint32_t sessionId, GameMode mode, const QVector<ReplayEvent>& events);
     void errorResponse(StatusCode code, const QString& message);
     
 private slots:
     void onConnected();
     void onDisconnected();
     void onReadyRead();
-    void onSocketError(QAbstractSocket::SocketError error);
+    void onSocketError(const QString& error);
+    void onIOReady();
     
 private:
     NetworkManager();
@@ -79,7 +84,9 @@ private:
     void sendMessage(MessageType type, const QByteArray& body);
     void processBuffer();
     void handleMessage(MessageType type, const QByteArray& body);
-    
-    QTcpSocket* m_socket;
+    void pumpEvents();
+
+    std::unique_ptr<PosixSocketClient> m_socket;
     QByteArray m_recvBuffer;
+    QTimer* m_ioTimer;
 };
