@@ -100,6 +100,9 @@ void MainMenuWindow::displayStats(const UserStatsResponse& stats) {
 
 void MainMenuWindow::onPlayClicked() {
     LobbyWindow* lobbyWindow = new LobbyWindow(this);
+    connect(lobbyWindow, &LobbyWindow::backToMainMenu, this, [this]() {
+        this->show();
+    });
     lobbyWindow->show();
     this->hide();
 }

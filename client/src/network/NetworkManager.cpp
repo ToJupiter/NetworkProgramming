@@ -365,12 +365,21 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         }
         
         case MessageType::S2C_GET_REPLAY_RSP: {
-            auto resp = ProtocolHelper::unpackStruct<ReplayDataResponse>(body);
+            if (body.size() < sizeof(ReplayDataResponse)) return;
+            
+            auto* response = reinterpret_cast<const ReplayDataResponse*>(body.constData());
+            
             QVector<ReplayEvent> events;
-            for (uint32_t i = 0; i < resp.event_count && i < 10000; ++i) {
-                events.append(resp.events[i]);
+            const uint8_t* eventData = reinterpret_cast<const uint8_t*>(body.constData()) + sizeof(ReplayDataResponse);
+            size_t eventDataSize = body.size() - sizeof(ReplayDataResponse);
+            uint32_t actualEventCount = eventDataSize / sizeof(ReplayEvent);
+            
+            for (uint32_t i = 0; i < actualEventCount && i < response->event_count; ++i) {
+                const ReplayEvent* event = reinterpret_cast<const ReplayEvent*>(eventData + i * sizeof(ReplayEvent));
+                events.append(*event);
             }
-            emit replayDataResponse(resp.status, resp.session_id, resp.game_mode, events);
+            
+            emit replayDataResponse(response->status, response->session_id, response->game_mode, events);
             break;
         }
         

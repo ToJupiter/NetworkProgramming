@@ -45,6 +45,19 @@
        </spacer>
       </item>
       <item>
+       <widget class="QPushButton" name="btnBack">
+        <property name="text">
+         <string>← Back</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background:#95a5a6; color:white; font-weight:bold;</string>
+        </property>
+        <property name="minimumWidth">
+         <number>100</number>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="btnRefresh">
         <property name="text">
          <string>Refresh</string>

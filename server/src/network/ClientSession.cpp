@@ -361,71 +361,81 @@ void ClientSession::handleResumeGame() {
 }
 
 void ClientSession::handleGetReplay(const GetReplayRequest* req) {
-    ReplayDataResponse response{};
-    response.session_id = req->session_id;
-    response.status = StatusCode::SUCCESS;
-    response.event_count = 0;
-    
     try {
         auto &db = DatabaseManager::getInstance().getDb();
-
-        int sessionCount = 0;
-        db << "SELECT COUNT(*) FROM game_sessions WHERE id = ?" 
-           << req->session_id >> sessionCount;
-
-        if (sessionCount == 0) {
-            response.status = StatusCode::INVALID_REQUEST;
-            sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
-            return;
-        }
         
-        std::string gameMode;
-        db << "SELECT game_mode FROM game_sessions WHERE id = ?" 
-           << req->session_id >> gameMode;
-        response.game_mode = (gameMode == "Elimination") ? GameMode::ELIMINATION : GameMode::SCORING;
+        std::vector<ReplayEvent> events;
+        GameMode mode = GameMode::ELIMINATION;
 
-        db << "SELECT gl.question_id, gl.user_id, gl.selected_option, gl.is_correct, gl.response_time_ms, "
-                  "unixepoch(gl.timestamp), q.content, q.option1, q.option2, q.option3, q.option4, "
-                  "q.correct_option, q.difficulty "
-             "FROM game_log gl "
-             "JOIN questions q ON gl.question_id = q.id "
-             "WHERE gl.session_id = ? AND gl.user_id = ? "
-             "ORDER BY gl.id ASC" 
-           << req->session_id << state.userId
-           >> [&](uint32_t qid, uint32_t uid, uint8_t opt, bool correct, uint32_t resp_time, 
-                 uint64_t timestamp, const std::string& content, const std::string& opt1, 
-                 const std::string& opt2, const std::string& opt3, const std::string& opt4,
-                 int correct_opt, int difficulty) {
-              if (response.event_count < 10000) {
-                  auto& event = response.events[response.event_count++];
-                  event.question_id = qid;
-                  event.user_id = uid;
-                  event.selected_option = opt;
-                  event.is_correct = correct;
-                  event.response_time_ms = resp_time;
-                  event.timestamp_ms = timestamp * 1000;
-                  event.correct_option = static_cast<uint8_t>(correct_opt);
-                  event.difficulty = static_cast<uint8_t>(difficulty);
-                  
-                  strncpy(event.question_content, content.c_str(), MAX_QUESTION_CONTENT_LEN - 1);
-                  event.question_content[MAX_QUESTION_CONTENT_LEN - 1] = '\0';
-                  
-                  strncpy(event.options[0], opt1.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                  event.options[0][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-                  strncpy(event.options[1], opt2.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                  event.options[1][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-                  strncpy(event.options[2], opt3.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                  event.options[2][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-                  strncpy(event.options[3], opt4.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                  event.options[3][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-              }
+        db << "SELECT game_mode FROM game_sessions WHERE id = ?"
+           << req->session_id
+           >> [&](const std::string& modeStr) {
+               mode = (modeStr == "Elimination") ? GameMode::ELIMINATION : GameMode::SCORING;
            };
-           
-        sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
+
+        db << "SELECT gl.timestamp, gl.question_id, gl.user_id, gl.selected_option, "
+                  "gl.is_correct, gl.response_time_ms, "
+                  "q.content, q.option1, q.option2, q.option3, q.option4, "
+                  "q.correct_option, q.difficulty "
+              "FROM game_log gl "
+              "JOIN questions q ON gl.question_id = q.id "
+              "WHERE gl.session_id = ? AND gl.user_id = ? "
+              "ORDER BY gl.id ASC"
+           << req->session_id << state.userId
+           >> [&](const std::string& ts, uint32_t qid, uint32_t uid, int sel_opt,
+                  bool correct, uint32_t resp_ms,
+                  const std::string& content, const std::string& opt1,
+                  const std::string& opt2, const std::string& opt3,
+                  const std::string& opt4, int corr_opt, int diff) {
+               ReplayEvent event{};
+               event.timestamp_ms = resp_ms;
+               event.question_id = qid;
+               event.user_id = uid;
+               event.selected_option = static_cast<uint8_t>(sel_opt);
+               event.is_correct = correct;
+               event.response_time_ms = resp_ms;
+               event.correct_option = static_cast<uint8_t>(corr_opt);
+               event.difficulty = static_cast<uint8_t>(diff);
+
+               strncpy(event.question_content, content.c_str(), MAX_QUESTION_CONTENT_LEN - 1);
+               event.question_content[MAX_QUESTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[0], opt1.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[0][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[1], opt2.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[1][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[2], opt3.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[2][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[3], opt4.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[3][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+               
+               events.push_back(event);
+           };
+        
+        ReplayDataResponse response{};
+        response.status = StatusCode::SUCCESS;
+        response.session_id = req->session_id;
+        response.game_mode = mode;
+        response.event_count = static_cast<uint32_t>(events.size());
+        
+        std::vector<uint8_t> payload;
+        payload.resize(sizeof(ReplayDataResponse) + events.size() * sizeof(ReplayEvent));
+        
+        memcpy(payload.data(), &response, sizeof(ReplayDataResponse));
+        memcpy(payload.data() + sizeof(ReplayDataResponse), events.data(), events.size() * sizeof(ReplayEvent));
+        
+        sendResponse(MessageType::S2C_GET_REPLAY_RSP, payload.data(), payload.size());
     } catch (std::exception &e) {
         std::cerr << "DB Error getting replay: " << e.what() << std::endl;
-        response.status = StatusCode::FAILURE_GENERIC;
-        sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
+        ReplayDataResponse errorResponse{};
+        errorResponse.status = StatusCode::FAILURE_GENERIC;
+        errorResponse.session_id = req->session_id;
+        errorResponse.game_mode = GameMode::ELIMINATION;
+        errorResponse.event_count = 0;
+        sendResponse(MessageType::S2C_GET_REPLAY_RSP, &errorResponse, sizeof(errorResponse));
     }
 }
 

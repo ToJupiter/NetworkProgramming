@@ -51,6 +51,7 @@ void LobbyWindow::setupUI() {
 
 void LobbyWindow::setupConnections() {
     // UI signals
+    connect(ui->btnBack, &QPushButton::clicked, this, &LobbyWindow::onBackClicked);
     connect(ui->btnRefresh, &QPushButton::clicked, this, &LobbyWindow::onRefreshClicked);
     connect(ui->btnCreateRoom, &QPushButton::clicked, this, &LobbyWindow::onCreateRoomClicked);
     connect(ui->btnStats, &QPushButton::clicked, this, &LobbyWindow::onStatsClicked);
@@ -85,6 +86,12 @@ void LobbyWindow::stopAutoRefresh() {
 void LobbyWindow::onRefreshClicked() {
     ui->lblStatus->setText("Loading rooms...");
     networkManager->sendListRooms();
+}
+
+void LobbyWindow::onBackClicked()
+{
+    emit backToMainMenu();
+    this->close();
 }
 
 void LobbyWindow::onCreateRoomClicked() {

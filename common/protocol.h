@@ -274,7 +274,6 @@ struct ReplayDataResponse {
     uint32_t session_id;
     GameMode game_mode;
     uint32_t event_count;
-    ReplayEvent events[10000];
 };
 
 struct GameHistoryEntry {

@@ -22,7 +22,7 @@ public:
     ~LobbyWindow();
 
 private slots:
-    // UI slots
+    void onBackClicked();
     void onRefreshClicked();
     void onCreateRoomClicked();
     void onStatsClicked();
@@ -61,6 +61,9 @@ private:
     QVector<RoomInfo> cachedRooms;
     int selectedRoomIndex;
     bool joinInProgress;
+
+signals:
+    void backToMainMenu();
 };
 
 #endif // LOBBYWINDOW_H
