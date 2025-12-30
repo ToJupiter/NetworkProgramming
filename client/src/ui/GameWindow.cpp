@@ -406,7 +406,7 @@ void GameWindow::onGameTerminated(TerminationReason reason) {
     setButtonsEnabled(false);
     QString why;
     switch (reason) {
-        case TerminationReason::HOST_LEFT: why = "Host left the match"; break;
+        case TerminationReason::HOST_LEFT: why = "Player left the match"; break;
         case TerminationReason::NOT_ENOUGH_PLAYERS: why = "Not enough players"; break;
         case TerminationReason::SERVER_SHUTDOWN: why = "Server shutdown"; break;
         default: why = "Match terminated"; break;
