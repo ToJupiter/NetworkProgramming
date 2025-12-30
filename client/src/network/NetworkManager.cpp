@@ -157,6 +157,10 @@ void NetworkManager::sendGetGameHistory() {
     sendMessage(MessageType::C2S_GET_GAME_HISTORY_REQ, QByteArray());
 }
 
+void NetworkManager::sendForfeitGame() {
+    sendMessage(MessageType::C2S_LEAVE_MATCH_REQ, QByteArray());
+}
+
 // === Socket Event Handlers ===
 
 void NetworkManager::onConnected() {

@@ -117,12 +117,16 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
             if (state.isAuthenticated) handleResumeGame();
             break;
         case MessageType::C2S_GET_REPLAY_REQ:
-            if (state.isAuthenticated && body.size() >= sizeof(GetReplayRequest))
+            if (body.size() >= sizeof(GetReplayRequest))
                 handleGetReplay(reinterpret_cast<const GetReplayRequest*>(body.data()));
             break;
         case MessageType::C2S_GET_GAME_HISTORY_REQ:
             if (state.isAuthenticated)
                 handleGetGameHistory();
+            break;
+        case MessageType::C2S_LEAVE_MATCH_REQ:
+            if (state.isAuthenticated)
+                handleForfeitGame();
             break;
         default:
             break;
@@ -358,61 +362,70 @@ void ClientSession::handleResumeGame() {
 
 void ClientSession::handleGetReplay(const GetReplayRequest* req) {
     ReplayDataResponse response{};
+    response.session_id = req->session_id;
+    response.status = StatusCode::SUCCESS;
+    response.event_count = 0;
+    
     try {
         auto &db = DatabaseManager::getInstance().getDb();
 
-        int participationCount = 0;
-        db << "SELECT COUNT(*) FROM session_participants WHERE session_id = ? AND user_id = ?"
-        << req->session_id << state.userId >> participationCount;
+        int sessionCount = 0;
+        db << "SELECT COUNT(*) FROM game_sessions WHERE id = ?" 
+           << req->session_id >> sessionCount;
 
-        if (participationCount == 0)
+        if (sessionCount == 0) {
             response.status = StatusCode::INVALID_REQUEST;
-        else {
-            std::string gameMode;
-            db << "SELECT game_mode FROM game_sessions WHERE id = ?" 
-               << req->session_id >> gameMode;
-            response.game_mode = (gameMode == "Elimination") ? GameMode::ELIMINATION : GameMode::SCORING;
-
-            db << "SELECT gl.question_id, gl.user_id, gl.selected_option, gl.is_correct, gl.response_time_ms, "
-                      "unixepoch(gl.timestamp), q.content, q.option1, q.option2, q.option3, q.option4, "
-                      "q.correct_option, q.difficulty "
-                 "FROM game_log gl "
-                 "JOIN questions q ON gl.question_id = q.id "
-                 "WHERE gl.session_id = ? ORDER BY gl.id ASC" 
-               << req->session_id
-               >> [&](uint32_t qid, uint32_t uid, uint8_t opt, bool correct, uint32_t resp_time, 
-                     uint64_t timestamp, const std::string& content, const std::string& opt1, 
-                     const std::string& opt2, const std::string& opt3, const std::string& opt4,
-                     int correct_opt, int difficulty) {
-                  if (response.event_count < 10000) {
-                      auto& event = response.events[response.event_count++];
-                      event.question_id = qid;
-                      event.user_id = uid;
-                      event.selected_option = opt;
-                      event.is_correct = correct;
-                      event.response_time_ms = resp_time;
-                      event.timestamp_ms = timestamp * 1000;
-                      event.correct_option = static_cast<uint8_t>(correct_opt);
-                      event.difficulty = static_cast<uint8_t>(difficulty);
-                      
-                      strncpy(event.question_content, content.c_str(), MAX_QUESTION_CONTENT_LEN - 1);
-                      event.question_content[MAX_QUESTION_CONTENT_LEN - 1] = '\0';
-                      
-                      strncpy(event.options[0], opt1.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                      event.options[0][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-                      strncpy(event.options[1], opt2.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                      event.options[1][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-                      strncpy(event.options[2], opt3.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                      event.options[2][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-                      strncpy(event.options[3], opt4.c_str(), MAX_OPTION_CONTENT_LEN - 1);
-                      event.options[3][MAX_OPTION_CONTENT_LEN - 1] = '\0';
-                  }
-               };
-            response.status = StatusCode::SUCCESS;
+            sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
+            return;
         }
+        
+        std::string gameMode;
+        db << "SELECT game_mode FROM game_sessions WHERE id = ?" 
+           << req->session_id >> gameMode;
+        response.game_mode = (gameMode == "Elimination") ? GameMode::ELIMINATION : GameMode::SCORING;
+
+        db << "SELECT gl.question_id, gl.user_id, gl.selected_option, gl.is_correct, gl.response_time_ms, "
+                  "unixepoch(gl.timestamp), q.content, q.option1, q.option2, q.option3, q.option4, "
+                  "q.correct_option, q.difficulty "
+             "FROM game_log gl "
+             "JOIN questions q ON gl.question_id = q.id "
+             "WHERE gl.session_id = ? AND gl.user_id = ? "
+             "ORDER BY gl.id ASC" 
+           << req->session_id << state.userId
+           >> [&](uint32_t qid, uint32_t uid, uint8_t opt, bool correct, uint32_t resp_time, 
+                 uint64_t timestamp, const std::string& content, const std::string& opt1, 
+                 const std::string& opt2, const std::string& opt3, const std::string& opt4,
+                 int correct_opt, int difficulty) {
+              if (response.event_count < 10000) {
+                  auto& event = response.events[response.event_count++];
+                  event.question_id = qid;
+                  event.user_id = uid;
+                  event.selected_option = opt;
+                  event.is_correct = correct;
+                  event.response_time_ms = resp_time;
+                  event.timestamp_ms = timestamp * 1000;
+                  event.correct_option = static_cast<uint8_t>(correct_opt);
+                  event.difficulty = static_cast<uint8_t>(difficulty);
+                  
+                  strncpy(event.question_content, content.c_str(), MAX_QUESTION_CONTENT_LEN - 1);
+                  event.question_content[MAX_QUESTION_CONTENT_LEN - 1] = '\0';
+                  
+                  strncpy(event.options[0], opt1.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                  event.options[0][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+                  strncpy(event.options[1], opt2.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                  event.options[1][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+                  strncpy(event.options[2], opt3.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                  event.options[2][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+                  strncpy(event.options[3], opt4.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+                  event.options[3][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+              }
+           };
+           
         sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
     } catch (std::exception &e) {
         std::cerr << "DB Error getting replay: " << e.what() << std::endl;
+        response.status = StatusCode::FAILURE_GENERIC;
+        sendResponse(MessageType::S2C_GET_REPLAY_RSP, &response, sizeof(response));
     }
 }
 
@@ -460,4 +473,31 @@ void ClientSession::handleGetGameHistory() {
         response.status = StatusCode::FAILURE_GENERIC;
         sendResponse(MessageType::S2C_GET_GAME_HISTORY_RSP, &response, sizeof(response));
     }
+}
+
+void ClientSession::handleForfeitGame() {
+    if (state.currentRoomId == 0) return;
+    
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (!room) return;
+    
+    const int32_t ELO_PENALTY = 100;
+    
+    try {
+        auto& db = DatabaseManager::getInstance().getDb();
+        
+        db << "UPDATE users SET ranked_points = MAX(0, ranked_points - ?) WHERE id = ?"
+           << ELO_PENALTY << state.userId;
+        
+        std::cout << "Player " << state.displayName << " forfeited game. ELO penalty: -" 
+                  << ELO_PENALTY << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "DB Error applying forfeit penalty: " << e.what() << std::endl;
+    }
+    
+    GameTerminatedNotification notif{};
+    notif.reason = TerminationReason::HOST_LEFT; 
+    sendResponse(MessageType::S2C_GAME_TERMINATED_NOTIF, &notif, sizeof(notif));
+    
+    handleLeaveRoom();
 }

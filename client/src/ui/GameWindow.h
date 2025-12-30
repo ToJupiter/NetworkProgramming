@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QVector>
 #include <QStringList>
+#include <QMap>
 #include "protocol.h"
 #include "../models/GameState.h"
 
@@ -43,6 +44,7 @@ private slots:
     void onReturnedToRoom();
     void onPauseGameClicked();
     void onResumeGameClicked();
+    void onQuitGameClicked();
 
 private:
     void setupUiTheme();
@@ -80,7 +82,13 @@ private:
     bool questionActive;
     bool answerSent;
     bool paused;
+    
+    // Track per-player statistics
+    QMap<uint32_t, uint32_t> playerCorrectAnswers;
+    QMap<uint32_t, QVector<uint32_t>> playerResponseTimes;
 
 signals:
     void returnedToRoom();
+    void stayInRoom();
+    void forfeitedGame();
 };

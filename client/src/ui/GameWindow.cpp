@@ -1,5 +1,6 @@
 #include "ui_GameWindow.h"
 #include "GameWindow.h"
+#include "GameResultsWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 
@@ -94,6 +95,7 @@ void GameWindow::bindSignals() {
     connect(ui->btnOptionD, &QPushButton::clicked, this, &GameWindow::onOptionDClicked);
     connect(ui->btnPauseGame, &QPushButton::clicked, this, &GameWindow::onPauseGameClicked);
     connect(ui->btnResumeGame, &QPushButton::clicked, this, &GameWindow::onResumeGameClicked);
+    connect(ui->btnQuit, &QPushButton::clicked, this, &GameWindow::onQuitGameClicked);
 
     // Network signals
     connect(networkManager, &NetworkManager::questionNotif,
@@ -136,6 +138,23 @@ void GameWindow::onPauseGameClicked() {
 void GameWindow::onResumeGameClicked() {
     if (paused && hostUserId == sessionState->getUserId()) {
         networkManager->sendResumeGame();
+    }
+}
+
+void GameWindow::onQuitGameClicked() {
+    auto reply = QMessageBox::warning(
+        this,
+        "Quit Game",
+        "Are you sure you want to quit the game?\n\n"
+        "Your ELO will be negatively affected (-100 points).",
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No
+    );
+    
+    if (reply == QMessageBox::Yes) {
+        stopQuestionTimer();
+        networkManager->sendForfeitGame();
+        emit forfeitedGame();
     }
 }
 
@@ -259,6 +278,18 @@ void GameWindow::applyRoundResults(const QVector<PlayerRoundResult>& results) {
             if (p.user_id == res.user_id) {
                 p.score = res.total_score;
                 p.is_eliminated = res.was_eliminated;
+                
+                if (res.answered_question && res.points_for_this_question > 0) {
+                    playerCorrectAnswers[res.user_id]++;
+                }
+                
+                if (res.answered_question) {
+                    if (!playerResponseTimes.contains(res.user_id)) {
+                        playerResponseTimes[res.user_id] = QVector<uint32_t>();
+                    }
+                    uint32_t responseTime = static_cast<uint32_t>(answerElapsed.elapsed());
+                    playerResponseTimes[res.user_id].append(responseTime);
+                }
                 break;
             }
         }
@@ -293,31 +324,61 @@ void GameWindow::onGameOver(uint8_t rankingCount, const QVector<PlayerFinalResul
     setButtonsEnabled(false);
     questionActive = false;
 
-    QString text;
-    
-    // 0 = SINGLE_WINNER, 1 = DRAW, 2 = NO_WINNER_WIPEOUT
-    if (gameEndReason == 2) {
-        // No Winner - Everyone eliminated
-        text = "Game Over! No Winner - Everyone answered the last question incorrectly!";
-    } else if (gameEndReason == 1) {
-        // Draw - Multiple winners
-        QStringList winners;
-        for (const auto& p : rankings) {
-            if (p.is_winner) {
-                winners.append(QString::fromLatin1(p.display_name, MAX_DISPLAY_NAME_LEN));
+    QVector<PlayerResult> results;
+    for (int i = 0; i < rankingCount; ++i) {
+        const auto& ranking = rankings[i];
+        PlayerResult result;
+        result.user_id = ranking.user_id;
+        result.display_name = QString::fromLatin1(ranking.display_name, MAX_DISPLAY_NAME_LEN);
+        result.final_score = ranking.final_score;
+        result.final_rank = ranking.final_rank;
+        result.is_winner = ranking.is_winner;
+        
+        result.correct_answers = playerCorrectAnswers.value(ranking.user_id, 0);
+        
+        if (playerResponseTimes.contains(ranking.user_id) && 
+            !playerResponseTimes[ranking.user_id].isEmpty()) {
+            uint64_t totalTime = 0;
+            for (uint32_t time : playerResponseTimes[ranking.user_id]) {
+                totalTime += time;
             }
+            result.avg_response_time_ms = static_cast<uint32_t>(
+                totalTime / playerResponseTimes[ranking.user_id].size());
+        } else {
+            result.avg_response_time_ms = 0;
         }
-        text = QString("Game Over! It's a Draw!\nWinners: %1").arg(winners.join(", "));
-    } else {
-        // Single Winner
-        QString winner = rankingCount > 0 ? QString::fromLatin1(rankings[0].display_name, MAX_DISPLAY_NAME_LEN) : "";
-        text = QString("Game over!%1").arg(winner.isEmpty() ? QString() : QString(" Winner: %1").arg(winner));
+        
+        results.append(result);
     }
     
-    QMessageBox::information(this, "Game Over", text);
-
-    // Send return to room request instead of closing
-    networkManager->sendReturnToRoom();
+    // Show results window
+    auto* resultsWindow = new GameResultsWindow(
+        results, 
+        static_cast<GameEndReason>(gameEndReason),
+        winnerCount,
+        nullptr  // No parent to allow independent lifecycle
+    );
+    
+    // Capture necessary references before closing this window
+    NetworkManager* nm = networkManager;
+    SessionState* ss = sessionState;
+    
+    connect(resultsWindow, &GameResultsWindow::leaveRoomRequested, this, [this, nm, ss]() {
+        nm->sendLeaveRoom();
+        ss->setCurrentRoomId(0);
+        emit returnedToRoom();
+    }, Qt::QueuedConnection);
+    
+    connect(resultsWindow, &GameResultsWindow::stayInRoomRequested, this, [this, nm]() {
+        nm->sendReturnToRoom();
+        emit stayInRoom();
+    }, Qt::QueuedConnection);
+    
+    resultsWindow->setAttribute(Qt::WA_DeleteOnClose);
+    resultsWindow->show();
+    
+    // Hide instead of close so signals can still be processed
+    this->hide();
 }
 
 void GameWindow::onGamePaused() {

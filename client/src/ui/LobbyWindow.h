@@ -36,6 +36,9 @@ private slots:
                             uint8_t player_count, const QVector<PlayerInfo>& players, uint32_t host_user_id);
     void onConnectionError(const QString &error);
     void onStatsResponse(const UserStatsResponse& stats);
+    
+    // Room signals
+    void onRoomLeft();
 
     // Timer slot
     void onRefreshTimer();

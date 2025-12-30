@@ -88,7 +88,20 @@ void UserRepository::updateUserRanks(const std::vector<RankUpdateInfo>& results)
 
         for (const auto &p : results) {
             uint32_t elo = 1000;
-            db << "SELECT ranked_points FROM users WHERE id = ?" << p.user_id >> elo;
+            bool found = false;
+
+            db << "SELECT ranked_points FROM users WHERE id = ? " << p.user_id
+               >> [&](uint32_t points) {
+                   elo = points;
+                   found = true;
+               };
+               
+            if (!found) {
+                std::cerr << "User ID " << p.user_id << " not found. Aborting rank update." << std::endl;
+                db << "ROLLBACK; ";
+                return;
+            }
+
             currentElos.push_back(elo);
             totalElo += elo;
         }

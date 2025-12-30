@@ -37,6 +37,8 @@ set(SOURCES
     src/ui/ReplayWindow.cpp
     src/ui/GameHistoryWindow.cpp
     src/ui/StatsWindow.cpp
+    src/ui/GameResultsWindow.cpp
+    src/ui/SessionListDialog.cpp
     src/models/SessionState.cpp
     src/models/GameState.cpp
 )
@@ -54,6 +56,8 @@ set(HEADERS
     src/ui/ReplayWindow.h
     src/ui/GameHistoryWindow.h
     src/ui/StatsWindow.h
+    src/ui/GameResultsWindow.h
+    src/ui/SessionListDialog.h
     src/models/SessionState.h
     src/models/GameState.h
     ../common/protocol.h
@@ -69,6 +73,8 @@ set(UI_FILES
     src/ui/ReplayWindow.ui
     src/ui/GameHistoryWindow.ui
     src/ui/StatsWindow.ui
+    src/ui/GameResultsWindow.ui
+    src/ui/SessionListDialog.ui
 )
 
 # Executable

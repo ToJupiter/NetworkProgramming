@@ -1,18 +1,7 @@
 #include "ReplayWindow.h"
 #include "ui_ReplayWindow.h"
 #include "../network/NetworkManager.h"
-#include <QDebug>
-#include <QTableWidgetItem>
-#include <QHeaderView>
 #include <QMessageBox>
-
-namespace {
-QString formatTime(uint32_t ms) {
-    uint32_t sec = ms / 1000;
-    uint32_t msec = ms % 1000;
-    return QString("%1.%2s").arg(sec).arg(msec, 3, 10, QChar('0'));
-}
-}
 
 ReplayWindow::ReplayWindow(uint32_t sessionId, QWidget* parent)
     : QMainWindow(parent)
@@ -20,213 +9,163 @@ ReplayWindow::ReplayWindow(uint32_t sessionId, QWidget* parent)
     , networkManager(&NetworkManager::instance())
     , sessionId(sessionId)
     , gameMode(GameMode::ELIMINATION)
-    , currentEventIndex(0)
+    , currentIndex(-1)
     , isPlaying(false)
     , playbackTimer(new QTimer(this))
 {
     ui->setupUi(this);
     setWindowTitle(QString("Replay - Session %1").arg(sessionId));
     
-    connect(playbackTimer, &QTimer::timeout, this, &ReplayWindow::onReplayTick);
-    connect(networkManager, &NetworkManager::replayDataResponse,
-            this, &ReplayWindow::onReplayDataReceived);
-    connect(networkManager, &NetworkManager::connectionError,
-            this, &ReplayWindow::onConnectionError);
+    ui->btnOptionA->setStyleSheet("background:#e74c3c; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionB->setStyleSheet("background:#2980b9; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionC->setStyleSheet("background:#f1c40f; color:black; font-size:14px; font-weight:bold;");
+    ui->btnOptionD->setStyleSheet("background:#27ae60; color:white; font-size:14px; font-weight:bold;");
     
-    ui->btnPlay->setStyleSheet("background:#27ae60; color:white; font-weight:bold;");
-    ui->btnPause->setStyleSheet("background:#f39c12; color:white; font-weight:bold;");
-    ui->btnStop->setStyleSheet("background:#c0392b; color:white; font-weight:bold;");
-    ui->btnNext->setStyleSheet("background:#3498db; color:white; font-weight:bold;");
-    ui->btnPrev->setStyleSheet("background:#9b59b6; color:white; font-weight:bold;");
+    ui->btnOptionA->setEnabled(false);
+    ui->btnOptionB->setEnabled(false);
+    ui->btnOptionC->setEnabled(false);
+    ui->btnOptionD->setEnabled(false);
+    
+    connect(playbackTimer, &QTimer::timeout, this, &ReplayWindow::onPlaybackTick);
+    connect(networkManager, &NetworkManager::replayDataResponse, this, &ReplayWindow::onReplayDataReceived);
+    connect(networkManager, &NetworkManager::connectionError, this, &ReplayWindow::onConnectionError);
     
     connect(ui->btnPlay, &QPushButton::clicked, this, &ReplayWindow::onPlayClicked);
     connect(ui->btnPause, &QPushButton::clicked, this, &ReplayWindow::onPauseClicked);
-    connect(ui->btnStop, &QPushButton::clicked, this, &ReplayWindow::onStopClicked);
-    connect(ui->btnNext, &QPushButton::clicked, this, &ReplayWindow::onNextEventClicked);
-    connect(ui->btnPrev, &QPushButton::clicked, this, &ReplayWindow::onPrevEventClicked);
+    connect(ui->btnNext, &QPushButton::clicked, this, &ReplayWindow::onNextClicked);
+    connect(ui->btnPrev, &QPushButton::clicked, this, &ReplayWindow::onPrevClicked);
+    connect(ui->btnClose, &QPushButton::clicked, this, &ReplayWindow::onCloseClicked);
     
-    ui->tblAnswers->setColumnCount(3);
-    ui->tblAnswers->setHorizontalHeaderLabels({"Player", "Answer", "Response Time"});
-    ui->tblAnswers->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    ui->tblAnswers->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->lblStatus->setText("Loading replay data...");
+    ui->lblQuestion->setText("");
+    ui->lblQuestionInfo->setText("");
     
-    ui->lblEventInfo->setText("Waiting for replay data...");
-    
-    loadReplayData();
+    networkManager->sendGetReplay(sessionId);
 }
 
 ReplayWindow::~ReplayWindow() {
+    playbackTimer->stop();
     delete ui;
-}
-
-void ReplayWindow::loadReplayData() {
-    networkManager->sendGetReplay(sessionId);
 }
 
 void ReplayWindow::onReplayDataReceived(StatusCode status, uint32_t responseSessionId, 
                                         GameMode mode, const QVector<ReplayEvent>& eventList) {
-    if (status != StatusCode::SUCCESS || responseSessionId != sessionId) {
-        QMessageBox::critical(this, "Replay Error", "Failed to load replay data");
+    if (responseSessionId != sessionId) return;
+    
+    if (status != StatusCode::SUCCESS) {
+        ui->lblStatus->setText("Failed to load replay data");
+        QMessageBox::critical(this, "Error", "Failed to load replay data");
+        return;
+    }
+    
+    if (eventList.isEmpty()) {
+        ui->lblStatus->setText("No replay events found for this session");
         return;
     }
     
     gameMode = mode;
     events = eventList;
+    currentIndex = 0;
     
-    buildEventLog();
-    updateEventList();
+    QString modeStr = (gameMode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
+    ui->lblStatus->setText(QString("Loaded %1 questions - Mode: %2").arg(events.size()).arg(modeStr));
     
-    if (!events.isEmpty()) {
-        currentEventIndex = 0;
-        displayCurrentEvent();
+    displayQuestion(0);
+    updateNavigationButtons();
+}
+
+void ReplayWindow::displayQuestion(int index) {
+    if (index < 0 || index >= events.size()) return;
+    
+    currentIndex = index;
+    const ReplayEvent& event = events[index];
+    
+    ui->lblQuestionInfo->setText(QString("Question %1 of %2").arg(index + 1).arg(events.size()));
+    ui->lblQuestion->setText(QString::fromUtf8(event.question_content));
+    
+    ui->btnOptionA->setText(QString("A) %1").arg(QString::fromUtf8(event.options[0])));
+    ui->btnOptionB->setText(QString("B) %1").arg(QString::fromUtf8(event.options[1])));
+    ui->btnOptionC->setText(QString("C) %1").arg(QString::fromUtf8(event.options[2])));
+    ui->btnOptionD->setText(QString("D) %1").arg(QString::fromUtf8(event.options[3])));
+    
+    resetOptionStyles();
+    highlightSelectedOption(event.selected_option);
+    
+    QString responseInfo = QString("Your answer: Option %1 | Response time: %2 ms")
+        .arg(QChar('A' + event.selected_option - 1))
+        .arg(event.response_time_ms);
+    ui->lblResponseInfo->setText(responseInfo);
+    
+    updateNavigationButtons();
+}
+
+void ReplayWindow::highlightSelectedOption(uint8_t option) {
+    QString selectedStyle = "background:#9b59b6; color:white; font-size:14px; font-weight:bold; border:3px solid #2c3e50;";
+    
+    switch (option) {
+        case 1: ui->btnOptionA->setStyleSheet(selectedStyle); break;
+        case 2: ui->btnOptionB->setStyleSheet(selectedStyle); break;
+        case 3: ui->btnOptionC->setStyleSheet(selectedStyle); break;
+        case 4: ui->btnOptionD->setStyleSheet(selectedStyle); break;
     }
 }
 
-void ReplayWindow::buildEventLog() {
-    questions.clear();
-    
-    for (const auto& event : events) {
-        QuestionData& qdata = questions[event.question_id];
-        if (qdata.options.isEmpty()) {
-            qdata.questionId = event.question_id;
-        }
-        
-        qdata.playerAnswers[event.user_id] = event.selected_option;
-        qdata.playerResponseTimes[event.user_id] = event.response_time_ms;
-    }
+void ReplayWindow::resetOptionStyles() {
+    ui->btnOptionA->setStyleSheet("background:#e74c3c; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionB->setStyleSheet("background:#2980b9; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionC->setStyleSheet("background:#f1c40f; color:black; font-size:14px; font-weight:bold;");
+    ui->btnOptionD->setStyleSheet("background:#27ae60; color:white; font-size:14px; font-weight:bold;");
 }
 
-void ReplayWindow::updateEventList() {
-    ui->lstEvents->clear();
-    
-    for (int i = 0; i < events.size(); ++i) {
-        const auto& event = events[i];
-        QString text = QString("Event %1: Q%2 at %3ms")
-            .arg(i + 1)
-            .arg(event.question_id)
-            .arg(event.timestamp_ms);
-        ui->lstEvents->addItem(text);
-    }
+void ReplayWindow::updateNavigationButtons() {
+    ui->btnPrev->setEnabled(currentIndex > 0);
+    ui->btnNext->setEnabled(currentIndex < events.size() - 1);
 }
 
-void ReplayWindow::displayCurrentEvent() {
-    if (currentEventIndex < 0 || currentEventIndex >= events.size()) {
-        ui->lblEventInfo->setText("No events to display");
-        return;
-    }
-    
-    const auto& event = events[currentEventIndex];
-    
-    QString difficultyStr;
-    if (event.difficulty == 1) difficultyStr = "Easy";
-    else if (event.difficulty == 2) difficultyStr = "Medium";
-    else if (event.difficulty == 3) difficultyStr = "Hard";
-    else difficultyStr = "Unknown";
-    
-    QString correctOptionStr = QString("Option %1").arg(QChar('A' + event.correct_option - 1));
-    QString selectedOptionStr = QString("Option %1").arg(QChar('A' + event.selected_option - 1));
-    bool isCorrect = (event.selected_option == event.correct_option);
-    
-    ui->lblEventInfo->setText(QString("Event %1 / %2 - %3 (%4) - Answered: %5 (Correct: %6) - %7ms")
-        .arg(currentEventIndex + 1)
-        .arg(events.size())
-        .arg(QString::fromUtf8(event.question_content, strlen(event.question_content)))
-        .arg(difficultyStr)
-        .arg(selectedOptionStr)
-        .arg(isCorrect ? "✓" : "✗")
-        .arg(event.response_time_ms));
-    
-    ui->lstEvents->setCurrentRow(currentEventIndex);
-    
-    const auto& qdata = questions[event.question_id];
-    ui->tblAnswers->setRowCount(0);
-    
-    int row = 0;
-    for (auto it = qdata.playerAnswers.begin(); it != qdata.playerAnswers.end(); ++it) {
-        uint32_t userId = it.key();
-        uint8_t answer = it.value();
-        uint32_t responseTime = qdata.playerResponseTimes.value(userId, 0);
-        
-        ui->tblAnswers->insertRow(row);
-        
-        auto* userItem = new QTableWidgetItem(QString::number(userId));
-        auto* ansItem = new QTableWidgetItem(QString("Option %1").arg(QChar('A' + answer - 1)));
-        auto* timeItem = new QTableWidgetItem(formatTime(responseTime));
-        
-        userItem->setFlags(userItem->flags() & ~Qt::ItemIsEditable);
-        ansItem->setFlags(ansItem->flags() & ~Qt::ItemIsEditable);
-        timeItem->setFlags(timeItem->flags() & ~Qt::ItemIsEditable);
-        
-        ui->tblAnswers->setItem(row, 0, userItem);
-        ui->tblAnswers->setItem(row, 1, ansItem);
-        ui->tblAnswers->setItem(row, 2, timeItem);
-        
-        ++row;
-    }
+void ReplayWindow::setPlaybackState(bool playing) {
+    isPlaying = playing;
+    ui->btnPlay->setEnabled(!playing);
+    ui->btnPause->setEnabled(playing);
 }
 
 void ReplayWindow::onPlayClicked() {
-    if (!isPlaying) {
-        playReplay();
-    }
+    if (events.isEmpty()) return;
+    setPlaybackState(true);
+    playbackTimer->start(2000);
 }
 
 void ReplayWindow::onPauseClicked() {
-    if (isPlaying) {
-        pauseReplay();
-    }
-}
-
-void ReplayWindow::onStopClicked() {
-    stopReplay();
-}
-
-void ReplayWindow::onNextEventClicked() {
-    if (currentEventIndex < events.size() - 1) {
-        currentEventIndex++;
-        displayCurrentEvent();
-    }
-}
-
-void ReplayWindow::onPrevEventClicked() {
-    if (currentEventIndex > 0) {
-        currentEventIndex--;
-        displayCurrentEvent();
-    }
-}
-
-void ReplayWindow::playReplay() {
-    isPlaying = true;
-    ui->btnPlay->setEnabled(false);
-    ui->btnPause->setEnabled(true);
-    playbackTimer->start(500);
-}
-
-void ReplayWindow::pauseReplay() {
-    isPlaying = false;
     playbackTimer->stop();
-    ui->btnPlay->setEnabled(true);
-    ui->btnPause->setEnabled(false);
+    setPlaybackState(false);
 }
 
-void ReplayWindow::stopReplay() {
-    isPlaying = false;
+void ReplayWindow::onNextClicked() {
+    if (currentIndex < events.size() - 1) {
+        displayQuestion(currentIndex + 1);
+    }
+}
+
+void ReplayWindow::onPrevClicked() {
+    if (currentIndex > 0) {
+        displayQuestion(currentIndex - 1);
+    }
+}
+
+void ReplayWindow::onCloseClicked() {
     playbackTimer->stop();
-    currentEventIndex = 0;
-    displayCurrentEvent();
-    ui->btnPlay->setEnabled(true);
-    ui->btnPause->setEnabled(false);
+    close();
 }
 
-void ReplayWindow::onReplayTick() {
-    if (isPlaying && currentEventIndex < events.size() - 1) {
-        currentEventIndex++;
-        displayCurrentEvent();
-    } else if (currentEventIndex >= events.size() - 1) {
-        pauseReplay();
+void ReplayWindow::onPlaybackTick() {
+    if (currentIndex < events.size() - 1) {
+        displayQuestion(currentIndex + 1);
+    } else {
+        playbackTimer->stop();
+        setPlaybackState(false);
     }
 }
 
 void ReplayWindow::onConnectionError(const QString& error) {
+    ui->lblStatus->setText("Connection error");
     QMessageBox::critical(this, "Connection Error", error);
 }

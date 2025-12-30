@@ -149,6 +149,7 @@ void LobbyWindow::onRoomTableItemClicked(int row, int column) {
                     // Open RoomWindow using known room info; player list will populate via notifications
                     if (!roomWindow) {
                         roomWindow = new RoomWindow(room, /*host_user_id*/ session.getUserId(), QVector<PlayerInfo>{}, this);
+                        connect(roomWindow, &RoomWindow::leftRoom, this, &LobbyWindow::onRoomLeft);
                     }
                     this->hide();
                     roomWindow->show();
@@ -216,6 +217,7 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
         // Transition to RoomWindow (Phase 4)
         if (!roomWindow) {
             roomWindow = new RoomWindow(room_info, host_user_id, players, this);
+            connect(roomWindow, &RoomWindow::leftRoom, this, &LobbyWindow::onRoomLeft);
         }
         this->hide();
         roomWindow->show();
@@ -238,6 +240,7 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
             stopAutoRefresh();
             if (!roomWindow) {
                 roomWindow = new RoomWindow(currentRoomInfo, /*host_user_id*/ myUserId, QVector<PlayerInfo>{}, this);
+                connect(roomWindow, &RoomWindow::leftRoom, this, &LobbyWindow::onRoomLeft);
             }
             this->hide();
             roomWindow->show();
@@ -322,4 +325,13 @@ QString LobbyWindow::formatGameMode(GameMode mode) const {
 
 QString LobbyWindow::formatRoomStatus(bool inGame) const {
     return inGame ? "In Game" : "Waiting";
+}
+
+void LobbyWindow::onRoomLeft() {
+    // User left the room, return to lobby
+    startAutoRefresh();
+    this->show();
+    this->raise();
+    this->activateWindow();
+    onRefreshClicked();
 }

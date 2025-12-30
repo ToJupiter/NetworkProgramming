@@ -186,6 +186,8 @@ void RoomWindow::onLeaveRoomClicked()
 
     if (reply == QMessageBox::Yes) {
         networkManager->sendLeaveRoom();
+        sessionState->setCurrentRoomId(0);
+        emit leftRoom();
         this->close();
     }
 }
@@ -210,6 +212,12 @@ void RoomWindow::onGameStarted()
     
     // Connect return-to-room signal
     connect(gameWindow, &GameWindow::returnedToRoom, this, &RoomWindow::onReturnedToRoom);
+    
+    // Connect stay-in-room signal  
+    connect(gameWindow, &GameWindow::stayInRoom, this, &RoomWindow::onStayInRoom);
+    
+    // Connect forfeit signal - player quits game and goes to main menu
+    connect(gameWindow, &GameWindow::forfeitedGame, this, &RoomWindow::onPlayerForfeit);
     
     this->hide();
     gameWindow->show();
@@ -420,21 +428,44 @@ void RoomWindow::stopCountdownTimer()
 
 void RoomWindow::onReturnedToRoom()
 {
-    // Close game window and show room window again
+    // Game ended and player is leaving - signal to parent to return to lobby
     if (gameWindow) {
         gameWindow->close();
         gameWindow = nullptr;
     }
     
-    // Reset local player ready state
+    // Emit signal that we're leaving the room
+    emit leftRoom();
+    this->close();
+}
+
+void RoomWindow::onPlayerForfeit()
+{
+    // Player forfeited game - close game window and return to main menu
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+    
+    // Emit signal that we're leaving the room (goes to main menu via lobby)
+    emit leftRoom();
+    this->close();
+}
+
+void RoomWindow::onStayInRoom()
+{
+    // Player chose to stay in room after game ends
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+    
+    // Reset ready status for next game
     isLocalPlayerReady = false;
-    ui->btnToggleReady->setText("Mark Ready");
     
-    // Show this window
+    // Show room window again
     this->show();
-    this->raise();
-    this->activateWindow();
     
-    // Restart auto-refresh to sync player list
+    // Restart auto-refresh to get updated player list
     setupAutoRefresh();
 }

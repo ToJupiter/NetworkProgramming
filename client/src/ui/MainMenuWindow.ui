@@ -14,17 +14,32 @@
    <string>Quiz Game - Main Menu</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,1,0,0">
+    <property name="spacing">
+     <number>15</number>
+    </property>
+    <property name="leftMargin">
+     <number>30</number>
+    </property>
+    <property name="topMargin">
+     <number>30</number>
+    </property>
+    <property name="rightMargin">
+     <number>30</number>
+    </property>
+    <property name="bottomMargin">
+     <number>30</number>
+    </property>
     <item>
      <widget class="QLabel" name="lblTitle">
       <property name="text">
-       <string>Quiz Game</string>
+       <string>🎮 Quiz Game 🎮</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
       </property>
       <property name="styleSheet">
-       <string notr="true">font-size: 28px; font-weight: bold; color: #2c3e50;</string>
+       <string notr="true">font-size: 32px; font-weight: bold; color: #2c3e50; padding: 10px;</string>
       </property>
      </widget>
     </item>
@@ -53,7 +68,7 @@
        <bool>true</bool>
       </property>
       <property name="styleSheet">
-       <string notr="true">font-size: 14px; background: #ecf0f1; padding: 20px; border-radius: 5px;</string>
+       <string notr="true">font-size: 14px; background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ecf0f1, stop:1 #d5dbdb); padding: 25px; border-radius: 10px; border: 2px solid #bdc3c7;</string>
       </property>
      </widget>
     </item>
@@ -62,65 +77,83 @@
       <property name="orientation">
        <enum>Qt::Vertical</enum>
       </property>
+      <property name="sizeType">
+       <enum>QSizePolicy::Fixed</enum>
+      </property>
       <property name="sizeHint" stdset="0">
        <size>
         <width>20</width>
-        <height>40</height>
+        <height>20</height>
        </size>
       </property>
      </spacer>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="layoutButtons" stretch="1,1,1,1">
-      <item>
+     <layout class="QGridLayout" name="layoutButtons">
+      <property name="spacing">
+       <number>15</number>
+      </property>
+      <item row="0" column="0">
        <widget class="QPushButton" name="btnPlay">
         <property name="text">
-         <string>Play Game</string>
+         <string>🎯 Play Game</string>
         </property>
-        <property name="minimumHeight">
-         <number>60</number>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>80</height>
+         </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">font-size: 14px; font-weight: bold;</string>
+         <string notr="true">font-size: 16px; font-weight: bold; border-radius: 10px;</string>
         </property>
        </widget>
       </item>
-      <item>
+      <item row="0" column="1">
        <widget class="QPushButton" name="btnViewStats">
         <property name="text">
-         <string>View Stats</string>
+         <string>📊 View Stats</string>
         </property>
-        <property name="minimumHeight">
-         <number>60</number>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>80</height>
+         </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">font-size: 14px; font-weight: bold;</string>
+         <string notr="true">font-size: 16px; font-weight: bold; border-radius: 10px;</string>
         </property>
        </widget>
       </item>
-      <item>
+      <item row="1" column="0">
        <widget class="QPushButton" name="btnReplay">
         <property name="text">
-         <string>Watch Replay</string>
+         <string>🎬 Watch Replay</string>
         </property>
-        <property name="minimumHeight">
-         <number>60</number>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>80</height>
+         </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">font-size: 14px; font-weight: bold;</string>
+         <string notr="true">font-size: 16px; font-weight: bold; border-radius: 10px;</string>
         </property>
        </widget>
       </item>
-      <item>
+      <item row="1" column="1">
        <widget class="QPushButton" name="btnGameHistory">
         <property name="text">
-         <string>Game History</string>
+         <string>📜 Game History</string>
         </property>
-        <property name="minimumHeight">
-         <number>60</number>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>80</height>
+         </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">font-size: 14px; font-weight: bold;</string>
+         <string notr="true">font-size: 16px; font-weight: bold; border-radius: 10px;</string>
         </property>
        </widget>
       </item>

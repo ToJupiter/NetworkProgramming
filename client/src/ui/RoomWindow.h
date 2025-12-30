@@ -38,6 +38,8 @@ private slots:
     void onPlayerLeft(uint32_t userId);
     void onPlayerReadyChanged(uint32_t userId, bool isReady);
     void onReturnedToRoom();
+    void onPlayerForfeit();
+    void onStayInRoom();
 
     // Network error
     void onNetworkError(const QString& error);
@@ -79,6 +81,9 @@ private:
     uint8_t countdownSecondsRemaining = 0;
     QVector<PlayerInfo> cachedPlayers;
     GameWindow *gameWindow = nullptr;
+
+signals:
+    void leftRoom();
 };
 
 #endif // ROOMWINDOW_H

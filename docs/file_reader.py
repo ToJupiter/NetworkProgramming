@@ -1,4 +1,5 @@
 import os
+import argparse
 
 def code_to_markdown(folder_path, output_file="code_output.md", extensions=(".c", ".cpp", ".h")):
     """
@@ -18,7 +19,7 @@ def code_to_markdown(folder_path, output_file="code_output.md", extensions=(".c"
                     file_path = os.path.join(root, file)
                     relative_path = os.path.relpath(file_path, folder_path)
 
-                    md_file.write(f"##  server/src/{relative_path} \n\n")
+                    md_file.write(f"##  {relative_path} \n\n")
                     md_file.write("```cpp\n")
                     
                     try:
@@ -34,8 +35,15 @@ def code_to_markdown(folder_path, output_file="code_output.md", extensions=(".c"
 
 # === Sử dụng ===
 if __name__ == "__main__":
-    FOLDER_PATH = "/home/rocminfo/Templates/NetworkProgramming/server/src"  # Thay bằng đường dẫn thư mục của bạn
-    OUTPUT_FILE = "current_server_code.md"
+    # FOLDER_PATH = "/home/rocminfo/Documents/NetworkProgramming/server/src"  # Thay bằng đường dẫn thư mục của bạn
+    # OUTPUT_FILE = "current_server_code.md"
+    parser = argparse.ArgumentParser(description='Normal parsing')
+    parser.add_argument('--folder_path', type=str, default="/home/rocminfo/Documents/NetworkProgramming/server/src", help="Folder path")
+    parser.add_argument('--output', default="current_server.code.md", type=str, help='Markdown output')
+    args = parser.parse_args()
+
+    FOLDER_PATH = args.folder_path
+    OUTPUT_FILE = args.output
     
     if not os.path.exists(FOLDER_PATH):
         print(f"❌ Thư mục không tồn tại: {FOLDER_PATH}")

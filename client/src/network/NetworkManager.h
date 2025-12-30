@@ -34,6 +34,7 @@ public:
     void sendResumeGame();
     void sendGetReplay(uint32_t sessionId);
     void sendGetGameHistory();
+    void sendForfeitGame();
     
 signals:
     // Connection signals

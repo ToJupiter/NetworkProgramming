@@ -3,6 +3,7 @@
 #include "LobbyWindow.h"
 #include "ReplayWindow.h"
 #include "GameHistoryWindow.h"
+#include "SessionListDialog.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 #include <QMessageBox>
@@ -124,15 +125,13 @@ void MainMenuWindow::onViewStatsClicked() {
 }
 
 void MainMenuWindow::onReplayClicked() {
-    bool ok;
-    uint32_t sessionId = QInputDialog::getInt(
-        this, "Replay Game", 
-        "Enter session ID to replay:", 
-        1, 1, 2147483647, 1, &ok);
-    
-    if (ok) {
-        ReplayWindow* replayWindow = new ReplayWindow(sessionId, this);
-        replayWindow->show();
+    SessionListDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        uint32_t sessionId = dialog.getSelectedSessionId();
+        if (sessionId > 0) {
+            ReplayWindow* replayWindow = new ReplayWindow(sessionId, this);
+            replayWindow->show();
+        }
     }
 }
 

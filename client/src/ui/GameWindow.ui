@@ -118,6 +118,19 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QPushButton" name="btnQuit">
+        <property name="text">
+         <string>Quit</string>
+        </property>
+        <property name="maximumWidth">
+         <number>80</number>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background:#c0392b; color:white; font-weight:bold;</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
     <item>

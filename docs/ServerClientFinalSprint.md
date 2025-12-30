@@ -85,3 +85,31 @@ Implement tier system with RP thresholds:
 - **Client**: Minimal changes, clean code.
 - **Server**: Minimal changes; focus on query optimization and clean endpoints
 - **Structure**: Maintain strong separation of concerns, clean interfaces. THIS IS IMPORTANT: CLEAN CODE MEANS NO COMMENTS ARE ALLOWED IN CODE. EVERY BLOCK OF CODE MUST BE WRITTEN CLEANLY FROM THE START, IT DOES NOT NEED COMMENTS. THE NEWLY GENERATED CODE MUST ALSO BLENDS IN WITH THE EXISTING CODE, WITH THE SAME STYLE AND SAME FUNCTIONAL DESIGN. MUST BE COMPATIBLE AND ACCLIMATED WITH THE EXISTING CODE.
+
+## Need to fix in this final sprint:
+### Requirements:
+1. Focus on clean code, beautiful code, strong code structure both in client and server (if any changes is needed). For server, try as much as you can not to touch it, but rather focus on the client code. The server code is already quite complete and clean, so try not to touch it as much as you do with the client code. For client, refractoring for cleanliness is needed rigorously.
+### Implementation
+1. We need to focus on fixing some kind of issue happening with ranked_points in the users table of the SQLite database. Please look carefully at the server code in order to find us the part where it saves the ranked_points and watch me if somehow it resets my ranked_points back to the default value of 1000. This is really dangerous because it poses something with data loss.
+2. When we end the game, you should generate us one more screen: the screen displaying the results of the game, sorted by score gained during the game, number of right questions, average time to answer for each of the question. This is the room stats display screen.
+3. When we press leave room (when we are in a Room in UI), please return us (route us to the MainMenu screen and use the leave room request in the protocol to get us out of the room). When we press leave room, please call the request to kick us out of the room and then return to MainMenuWindow. When we end a game, the Room only displays a button `Leave Room`. When we press this button, client immediately disconnected. This is not good. When we press this button, it should route us to the `MainMenuWindow`. 
+4. Please fix us the replay function by looking carefully at `protocol.h`, `client` and `server` code, also the `game_log` and `questions` table. This functionality still does not work at all, always an error. If authentication issues in the server side is the problem, remove all authentication because our game is open for replaying and every one should be able to watch it. And also, in the replay session chooser, list us a list of sessions we can see the replay (like a list of old games and we will choose one of them to watch the replay).
+5. Please edit the MainMenuWindow UI to be better looking, and tailor the Room member list as well. Everything should be done perfectly and clearly. 
+
+
+## Final final sprint:
+
+### Requirements:
+1. Focus on clean code, beautiful code, strong code structure both in client and server (if any changes is needed). For server, try as much as you can not to touch it, but rather focus on the client code. The server code is already quite complete and clean, so try not to touch it as much as you do with the client code. For client, refractoring for cleanliness is needed rigorously. Clean code means no comments in code, comprehensive structure, beautiful format. Code must be structured, compatible with old code.
+
+
+### Implementation
+1. The replay functionality is not working as intended. On the client side, it freezes at the "Waiting for the replay data..." with very slow response. The replay should work like this: 
+``` 
+-- It should only take into account the question that the current user_id answers, hence only query the rows in the game_log with the current user_id. Then, it will open a similar to GameWindow.ui window (the GameWindow.ui window displays the questions in a room game for the user to select and answer). Then, it will replay the questions that the current user answers (recorded in the game_log) and their answer (no need to display the correct answer to that question). It is like when you see a replay video, you see your actions, your selection (this time question answering is a selection) in the past.
+
+-- The loading phase of the database should be faster, whether by trying to optimize the query or set a good index to it. Try to write good queries instead of focusing too much on indexes.
+```
+2. When in-game, please add us a button named "Quit" and when player press the button, a prompt will be displayed with the quote "Are you sure you want to quit the game? Your ELO will be negatively affected". And when the player affirms, 100 ELO punishment is applied directly to his ranked_points. This should be updated immediately to the database! This is called forfeiting. This button routes directly to `MainMenuWindow` window of the client-side UI.
+3. At the end of the game, there is currently a Leave Room button only. But when I press this Leave Room button, client automatically shut itself down (disconnect from the server entirely). The process of the client auto turned itself off. This is unacceptable. And also, add us a button to continue being in that room. We can still play more games together, Leaving Room is not the only option.
+

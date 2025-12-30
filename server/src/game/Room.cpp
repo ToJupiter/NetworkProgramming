@@ -86,7 +86,6 @@ bool Room::setPlayerReady(uint32_t userId, bool ready) {
 
     broadcast(MessageType::S2C_READY_STATUS_NOTIF, &notif, sizeof(notif));
 
-    // Auto-start disabled; wait for explicit C2S_START_GAME_REQ from host
     return true;
 }
 
@@ -187,7 +186,6 @@ void Room::broadcast(MessageType type, const void* data, uint32_t len, uint32_t 
     for (auto& pair : participants) {
         if (pair.first != excludeUserId) {
             pair.second.session->sendMsg(type, data, len);
-            // Immediately flush to avoid epoll edge-triggered issues
             pair.second.session->writeData();
         }
     }
