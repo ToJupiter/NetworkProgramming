@@ -1,7 +1,7 @@
 # Source Code Collection
 
 ## client/CMakeLists.txt
-``` 
+``` txt
 cmake_minimum_required(VERSION 3.16)
 project(QuizClient VERSION 1.0.0 LANGUAGES CXX)
 
@@ -41,6 +41,8 @@ set(SOURCES
     src/ui/ReplayWindow.cpp
     src/ui/GameHistoryWindow.cpp
     src/ui/StatsWindow.cpp
+    src/ui/GameResultsWindow.cpp
+    src/ui/SessionListDialog.cpp
     src/models/SessionState.cpp
     src/models/GameState.cpp
 )
@@ -58,6 +60,8 @@ set(HEADERS
     src/ui/ReplayWindow.h
     src/ui/GameHistoryWindow.h
     src/ui/StatsWindow.h
+    src/ui/GameResultsWindow.h
+    src/ui/SessionListDialog.h
     src/models/SessionState.h
     src/models/GameState.h
     ../common/protocol.h
@@ -73,6 +77,8 @@ set(UI_FILES
     src/ui/ReplayWindow.ui
     src/ui/GameHistoryWindow.ui
     src/ui/StatsWindow.ui
+    src/ui/GameResultsWindow.ui
+    src/ui/SessionListDialog.ui
 )
 
 # Executable
@@ -84,10 +90,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 ```
 
-
-## These code below are all inside the folder client/src/
-
-##  main.cpp 
+##  client/main.cpp 
 
 ```cpp
 #include <QApplication>
@@ -104,7 +107,7 @@ int main(int argc, char* argv[]) {
 
 ---
 
-##  models/GameState.h 
+##  client/models/GameState.h 
 
 ```cpp
 #pragma once
@@ -198,7 +201,7 @@ private:
 
 ---
 
-##  models/SessionState.h 
+##  client/models/SessionState.h 
 
 ```cpp
 #pragma once
@@ -247,7 +250,7 @@ private:
 
 ---
 
-##  models/GameState.cpp 
+##  client/models/GameState.cpp 
 
 ```cpp
 #include "GameState.h"
@@ -336,7 +339,7 @@ void GameState::clear() {
 
 ---
 
-##  models/SessionState.cpp 
+##  client/models/SessionState.cpp 
 
 ```cpp
 #include "SessionState.h"
@@ -365,7 +368,7 @@ void SessionState::clear() {
 
 ---
 
-##  network/NetworkManager.cpp 
+##  client/network/NetworkManager.cpp 
 
 ```cpp
 #include "NetworkManager.h"
@@ -525,6 +528,10 @@ void NetworkManager::sendGetReplay(uint32_t sessionId) {
 
 void NetworkManager::sendGetGameHistory() {
     sendMessage(MessageType::C2S_GET_GAME_HISTORY_REQ, QByteArray());
+}
+
+void NetworkManager::sendForfeitGame() {
+    sendMessage(MessageType::C2S_LEAVE_MATCH_REQ, QByteArray());
 }
 
 // === Socket Event Handlers ===
@@ -731,12 +738,21 @@ void NetworkManager::handleMessage(MessageType type, const QByteArray& body) {
         }
         
         case MessageType::S2C_GET_REPLAY_RSP: {
-            auto resp = ProtocolHelper::unpackStruct<ReplayDataResponse>(body);
+            if (body.size() < sizeof(ReplayDataResponse)) return;
+            
+            auto* response = reinterpret_cast<const ReplayDataResponse*>(body.constData());
+            
             QVector<ReplayEvent> events;
-            for (uint32_t i = 0; i < resp.event_count && i < 10000; ++i) {
-                events.append(resp.events[i]);
+            const uint8_t* eventData = reinterpret_cast<const uint8_t*>(body.constData()) + sizeof(ReplayDataResponse);
+            size_t eventDataSize = body.size() - sizeof(ReplayDataResponse);
+            uint32_t actualEventCount = eventDataSize / sizeof(ReplayEvent);
+            
+            for (uint32_t i = 0; i < actualEventCount && i < response->event_count; ++i) {
+                const ReplayEvent* event = reinterpret_cast<const ReplayEvent*>(eventData + i * sizeof(ReplayEvent));
+                events.append(*event);
             }
-            emit replayDataResponse(resp.status, resp.session_id, resp.game_mode, events);
+            
+            emit replayDataResponse(response->status, response->session_id, response->game_mode, events);
             break;
         }
         
@@ -773,7 +789,7 @@ void NetworkManager::pumpEvents() {
 
 ---
 
-##  network/PosixSocketClient.cpp 
+##  client/network/PosixSocketClient.cpp 
 
 ```cpp
 #include "PosixSocketClient.h"
@@ -914,7 +930,7 @@ int PosixSocketClient::recv(uint8_t* buffer, size_t maxLen) {
 
 ---
 
-##  network/ProtocolHelper.h 
+##  client/network/ProtocolHelper.h 
 
 ```cpp
 #pragma once
@@ -963,7 +979,7 @@ public:
 
 ---
 
-##  network/NetworkManager.h 
+##  client/network/NetworkManager.h 
 
 ```cpp
 #pragma once
@@ -1002,6 +1018,7 @@ public:
     void sendResumeGame();
     void sendGetReplay(uint32_t sessionId);
     void sendGetGameHistory();
+    void sendForfeitGame();
     
 signals:
     // Connection signals
@@ -1065,7 +1082,7 @@ private:
 
 ---
 
-##  network/ProtocolHelper.cpp 
+##  client/network/ProtocolHelper.cpp 
 
 ```cpp
 #include "ProtocolHelper.h"
@@ -1119,7 +1136,7 @@ uint16_t ProtocolHelper::ntohs(uint16_t netshort) {
 
 ---
 
-##  network/PosixSocketClient.h 
+##  client/network/PosixSocketClient.h 
 
 ```cpp
 #pragma once
@@ -1151,7 +1168,7 @@ private:
 
 ---
 
-##  ui/LobbyWindow.cpp 
+##  client/ui/LobbyWindow.cpp 
 
 ```cpp
 #include "LobbyWindow.h"
@@ -1207,6 +1224,7 @@ void LobbyWindow::setupUI() {
 
 void LobbyWindow::setupConnections() {
     // UI signals
+    connect(ui->btnBack, &QPushButton::clicked, this, &LobbyWindow::onBackClicked);
     connect(ui->btnRefresh, &QPushButton::clicked, this, &LobbyWindow::onRefreshClicked);
     connect(ui->btnCreateRoom, &QPushButton::clicked, this, &LobbyWindow::onCreateRoomClicked);
     connect(ui->btnStats, &QPushButton::clicked, this, &LobbyWindow::onStatsClicked);
@@ -1241,6 +1259,12 @@ void LobbyWindow::stopAutoRefresh() {
 void LobbyWindow::onRefreshClicked() {
     ui->lblStatus->setText("Loading rooms...");
     networkManager->sendListRooms();
+}
+
+void LobbyWindow::onBackClicked()
+{
+    emit backToMainMenu();
+    this->close();
 }
 
 void LobbyWindow::onCreateRoomClicked() {
@@ -1305,6 +1329,7 @@ void LobbyWindow::onRoomTableItemClicked(int row, int column) {
                     // Open RoomWindow using known room info; player list will populate via notifications
                     if (!roomWindow) {
                         roomWindow = new RoomWindow(room, /*host_user_id*/ session.getUserId(), QVector<PlayerInfo>{}, this);
+                        connect(roomWindow, &RoomWindow::leftRoom, this, &LobbyWindow::onRoomLeft);
                     }
                     this->hide();
                     roomWindow->show();
@@ -1372,6 +1397,7 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
         // Transition to RoomWindow (Phase 4)
         if (!roomWindow) {
             roomWindow = new RoomWindow(room_info, host_user_id, players, this);
+            connect(roomWindow, &RoomWindow::leftRoom, this, &LobbyWindow::onRoomLeft);
         }
         this->hide();
         roomWindow->show();
@@ -1394,6 +1420,7 @@ void LobbyWindow::onJoinRoomResponse(StatusCode code, const RoomInfo& room_info,
             stopAutoRefresh();
             if (!roomWindow) {
                 roomWindow = new RoomWindow(currentRoomInfo, /*host_user_id*/ myUserId, QVector<PlayerInfo>{}, this);
+                connect(roomWindow, &RoomWindow::leftRoom, this, &LobbyWindow::onRoomLeft);
             }
             this->hide();
             roomWindow->show();
@@ -1480,11 +1507,20 @@ QString LobbyWindow::formatRoomStatus(bool inGame) const {
     return inGame ? "In Game" : "Waiting";
 }
 
+void LobbyWindow::onRoomLeft() {
+    // User left the room, return to lobby
+    startAutoRefresh();
+    this->show();
+    this->raise();
+    this->activateWindow();
+    onRefreshClicked();
+}
+
 ```
 
 ---
 
-##  ui/LoginWindow.h 
+##  client/ui/LoginWindow.h 
 
 ```cpp
 #pragma once
@@ -1530,7 +1566,7 @@ private:
 
 ---
 
-##  ui/LobbyWindow.h 
+##  client/ui/LobbyWindow.h 
 
 ```cpp
 #ifndef LOBBYWINDOW_H
@@ -1557,7 +1593,7 @@ public:
     ~LobbyWindow();
 
 private slots:
-    // UI slots
+    void onBackClicked();
     void onRefreshClicked();
     void onCreateRoomClicked();
     void onStatsClicked();
@@ -1571,6 +1607,9 @@ private slots:
                             uint8_t player_count, const QVector<PlayerInfo>& players, uint32_t host_user_id);
     void onConnectionError(const QString &error);
     void onStatsResponse(const UserStatsResponse& stats);
+    
+    // Room signals
+    void onRoomLeft();
 
     // Timer slot
     void onRefreshTimer();
@@ -1593,6 +1632,9 @@ private:
     QVector<RoomInfo> cachedRooms;
     int selectedRoomIndex;
     bool joinInProgress;
+
+signals:
+    void backToMainMenu();
 };
 
 #endif // LOBBYWINDOW_H
@@ -1601,7 +1643,7 @@ private:
 
 ---
 
-##  ui/MainMenuWindow.h 
+##  client/ui/MainMenuWindow.h 
 
 ```cpp
 #pragma once
@@ -1646,7 +1688,7 @@ private:
 
 ---
 
-##  ui/StatsWindow.h 
+##  client/ui/StatsWindow.h 
 
 ```cpp
 #pragma once
@@ -1676,11 +1718,12 @@ private:
 
 ---
 
-##  ui/GameWindow.cpp 
+##  client/ui/GameWindow.cpp 
 
 ```cpp
 #include "ui_GameWindow.h"
 #include "GameWindow.h"
+#include "GameResultsWindow.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 
@@ -1775,6 +1818,7 @@ void GameWindow::bindSignals() {
     connect(ui->btnOptionD, &QPushButton::clicked, this, &GameWindow::onOptionDClicked);
     connect(ui->btnPauseGame, &QPushButton::clicked, this, &GameWindow::onPauseGameClicked);
     connect(ui->btnResumeGame, &QPushButton::clicked, this, &GameWindow::onResumeGameClicked);
+    connect(ui->btnQuit, &QPushButton::clicked, this, &GameWindow::onQuitGameClicked);
 
     // Network signals
     connect(networkManager, &NetworkManager::questionNotif,
@@ -1817,6 +1861,23 @@ void GameWindow::onPauseGameClicked() {
 void GameWindow::onResumeGameClicked() {
     if (paused && hostUserId == sessionState->getUserId()) {
         networkManager->sendResumeGame();
+    }
+}
+
+void GameWindow::onQuitGameClicked() {
+    auto reply = QMessageBox::warning(
+        this,
+        "Quit Game",
+        "Are you sure you want to quit the game?\n\n"
+        "Your ELO will be negatively affected (-100 points).",
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No
+    );
+    
+    if (reply == QMessageBox::Yes) {
+        stopQuestionTimer();
+        networkManager->sendForfeitGame();
+        emit forfeitedGame();
     }
 }
 
@@ -1940,6 +2001,18 @@ void GameWindow::applyRoundResults(const QVector<PlayerRoundResult>& results) {
             if (p.user_id == res.user_id) {
                 p.score = res.total_score;
                 p.is_eliminated = res.was_eliminated;
+                
+                if (res.answered_question && res.points_for_this_question > 0) {
+                    playerCorrectAnswers[res.user_id]++;
+                }
+                
+                if (res.answered_question) {
+                    if (!playerResponseTimes.contains(res.user_id)) {
+                        playerResponseTimes[res.user_id] = QVector<uint32_t>();
+                    }
+                    uint32_t responseTime = static_cast<uint32_t>(answerElapsed.elapsed());
+                    playerResponseTimes[res.user_id].append(responseTime);
+                }
                 break;
             }
         }
@@ -1974,31 +2047,61 @@ void GameWindow::onGameOver(uint8_t rankingCount, const QVector<PlayerFinalResul
     setButtonsEnabled(false);
     questionActive = false;
 
-    QString text;
-    
-    // 0 = SINGLE_WINNER, 1 = DRAW, 2 = NO_WINNER_WIPEOUT
-    if (gameEndReason == 2) {
-        // No Winner - Everyone eliminated
-        text = "Game Over! No Winner - Everyone answered the last question incorrectly!";
-    } else if (gameEndReason == 1) {
-        // Draw - Multiple winners
-        QStringList winners;
-        for (const auto& p : rankings) {
-            if (p.is_winner) {
-                winners.append(QString::fromLatin1(p.display_name, MAX_DISPLAY_NAME_LEN));
+    QVector<PlayerResult> results;
+    for (int i = 0; i < rankingCount; ++i) {
+        const auto& ranking = rankings[i];
+        PlayerResult result;
+        result.user_id = ranking.user_id;
+        result.display_name = QString::fromLatin1(ranking.display_name, MAX_DISPLAY_NAME_LEN);
+        result.final_score = ranking.final_score;
+        result.final_rank = ranking.final_rank;
+        result.is_winner = ranking.is_winner;
+        
+        result.correct_answers = playerCorrectAnswers.value(ranking.user_id, 0);
+        
+        if (playerResponseTimes.contains(ranking.user_id) && 
+            !playerResponseTimes[ranking.user_id].isEmpty()) {
+            uint64_t totalTime = 0;
+            for (uint32_t time : playerResponseTimes[ranking.user_id]) {
+                totalTime += time;
             }
+            result.avg_response_time_ms = static_cast<uint32_t>(
+                totalTime / playerResponseTimes[ranking.user_id].size());
+        } else {
+            result.avg_response_time_ms = 0;
         }
-        text = QString("Game Over! It's a Draw!\nWinners: %1").arg(winners.join(", "));
-    } else {
-        // Single Winner
-        QString winner = rankingCount > 0 ? QString::fromLatin1(rankings[0].display_name, MAX_DISPLAY_NAME_LEN) : "";
-        text = QString("Game over!%1").arg(winner.isEmpty() ? QString() : QString(" Winner: %1").arg(winner));
+        
+        results.append(result);
     }
     
-    QMessageBox::information(this, "Game Over", text);
-
-    // Send return to room request instead of closing
-    networkManager->sendReturnToRoom();
+    // Show results window
+    auto* resultsWindow = new GameResultsWindow(
+        results, 
+        static_cast<GameEndReason>(gameEndReason),
+        winnerCount,
+        nullptr  // No parent to allow independent lifecycle
+    );
+    
+    // Capture necessary references before closing this window
+    NetworkManager* nm = networkManager;
+    SessionState* ss = sessionState;
+    
+    connect(resultsWindow, &GameResultsWindow::leaveRoomRequested, this, [this, nm, ss]() {
+        nm->sendLeaveRoom();
+        ss->setCurrentRoomId(0);
+        emit returnedToRoom();
+    }, Qt::QueuedConnection);
+    
+    connect(resultsWindow, &GameResultsWindow::stayInRoomRequested, this, [this, nm]() {
+        nm->sendReturnToRoom();
+        emit stayInRoom();
+    }, Qt::QueuedConnection);
+    
+    resultsWindow->setAttribute(Qt::WA_DeleteOnClose);
+    resultsWindow->show();
+    
+    // Hide instead of close so signals can still be processed
+    this->hide();
 }
 
 void GameWindow::onGamePaused() {
@@ -2026,7 +2129,7 @@ void GameWindow::onGameTerminated(TerminationReason reason) {
     setButtonsEnabled(false);
     QString why;
     switch (reason) {
-        case TerminationReason::HOST_LEFT: why = "Host left the match"; break;
+        case TerminationReason::HOST_LEFT: why = "Player left the match"; break;
         case TerminationReason::NOT_ENOUGH_PLAYERS: why = "Not enough players"; break;
         case TerminationReason::SERVER_SHUTDOWN: why = "Server shutdown"; break;
         default: why = "Match terminated"; break;
@@ -2110,7 +2213,7 @@ void GameWindow::setFeedback(const QString& text, bool warn) {
 
 ---
 
-##  ui/CreateRoomDialog.cpp 
+##  client/ui/CreateRoomDialog.cpp 
 
 ```cpp
 #include "CreateRoomDialog.h"
@@ -2199,7 +2302,7 @@ bool CreateRoomDialog::validateInput() {
 
 ---
 
-##  ui/StatsWindow.cpp 
+##  client/ui/StatsWindow.cpp 
 
 ```cpp
 #include "StatsWindow.h"
@@ -2281,7 +2384,7 @@ void StatsWindow::setStats(const UserStatsResponse &stats) {
 
 ---
 
-##  ui/CreateRoomDialog.h 
+##  client/ui/CreateRoomDialog.h 
 
 ```cpp
 #ifndef CREATEROCOMDIALOG_H
@@ -2323,24 +2426,13 @@ private:
 
 ---
 
-##  ui/ReplayWindow.cpp 
+##  client/ui/ReplayWindow.cpp 
 
 ```cpp
 #include "ReplayWindow.h"
 #include "ui_ReplayWindow.h"
 #include "../network/NetworkManager.h"
-#include <QDebug>
-#include <QTableWidgetItem>
-#include <QHeaderView>
 #include <QMessageBox>
-
-namespace {
-QString formatTime(uint32_t ms) {
-    uint32_t sec = ms / 1000;
-    uint32_t msec = ms % 1000;
-    return QString("%1.%2s").arg(sec).arg(msec, 3, 10, QChar('0'));
-}
-}
 
 ReplayWindow::ReplayWindow(uint32_t sessionId, QWidget* parent)
     : QMainWindow(parent)
@@ -2348,214 +2440,164 @@ ReplayWindow::ReplayWindow(uint32_t sessionId, QWidget* parent)
     , networkManager(&NetworkManager::instance())
     , sessionId(sessionId)
     , gameMode(GameMode::ELIMINATION)
-    , currentEventIndex(0)
+    , currentIndex(-1)
     , isPlaying(false)
     , playbackTimer(new QTimer(this))
 {
     ui->setupUi(this);
     setWindowTitle(QString("Replay - Session %1").arg(sessionId));
     
-    connect(playbackTimer, &QTimer::timeout, this, &ReplayWindow::onReplayTick);
-    connect(networkManager, &NetworkManager::replayDataResponse,
-            this, &ReplayWindow::onReplayDataReceived);
-    connect(networkManager, &NetworkManager::connectionError,
-            this, &ReplayWindow::onConnectionError);
+    ui->btnOptionA->setStyleSheet("background:#e74c3c; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionB->setStyleSheet("background:#2980b9; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionC->setStyleSheet("background:#f1c40f; color:black; font-size:14px; font-weight:bold;");
+    ui->btnOptionD->setStyleSheet("background:#27ae60; color:white; font-size:14px; font-weight:bold;");
     
-    ui->btnPlay->setStyleSheet("background:#27ae60; color:white; font-weight:bold;");
-    ui->btnPause->setStyleSheet("background:#f39c12; color:white; font-weight:bold;");
-    ui->btnStop->setStyleSheet("background:#c0392b; color:white; font-weight:bold;");
-    ui->btnNext->setStyleSheet("background:#3498db; color:white; font-weight:bold;");
-    ui->btnPrev->setStyleSheet("background:#9b59b6; color:white; font-weight:bold;");
+    ui->btnOptionA->setEnabled(false);
+    ui->btnOptionB->setEnabled(false);
+    ui->btnOptionC->setEnabled(false);
+    ui->btnOptionD->setEnabled(false);
+    
+    connect(playbackTimer, &QTimer::timeout, this, &ReplayWindow::onPlaybackTick);
+    connect(networkManager, &NetworkManager::replayDataResponse, this, &ReplayWindow::onReplayDataReceived);
+    connect(networkManager, &NetworkManager::connectionError, this, &ReplayWindow::onConnectionError);
     
     connect(ui->btnPlay, &QPushButton::clicked, this, &ReplayWindow::onPlayClicked);
     connect(ui->btnPause, &QPushButton::clicked, this, &ReplayWindow::onPauseClicked);
-    connect(ui->btnStop, &QPushButton::clicked, this, &ReplayWindow::onStopClicked);
-    connect(ui->btnNext, &QPushButton::clicked, this, &ReplayWindow::onNextEventClicked);
-    connect(ui->btnPrev, &QPushButton::clicked, this, &ReplayWindow::onPrevEventClicked);
+    connect(ui->btnNext, &QPushButton::clicked, this, &ReplayWindow::onNextClicked);
+    connect(ui->btnPrev, &QPushButton::clicked, this, &ReplayWindow::onPrevClicked);
+    connect(ui->btnClose, &QPushButton::clicked, this, &ReplayWindow::onCloseClicked);
     
-    ui->tblAnswers->setColumnCount(3);
-    ui->tblAnswers->setHorizontalHeaderLabels({"Player", "Answer", "Response Time"});
-    ui->tblAnswers->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    ui->tblAnswers->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->lblStatus->setText("Loading replay data...");
+    ui->lblQuestion->setText("");
+    ui->lblQuestionInfo->setText("");
     
-    ui->lblEventInfo->setText("Waiting for replay data...");
-    
-    loadReplayData();
+    networkManager->sendGetReplay(sessionId);
 }
 
 ReplayWindow::~ReplayWindow() {
+    playbackTimer->stop();
     delete ui;
-}
-
-void ReplayWindow::loadReplayData() {
-    networkManager->sendGetReplay(sessionId);
 }
 
 void ReplayWindow::onReplayDataReceived(StatusCode status, uint32_t responseSessionId, 
                                         GameMode mode, const QVector<ReplayEvent>& eventList) {
-    if (status != StatusCode::SUCCESS || responseSessionId != sessionId) {
-        QMessageBox::critical(this, "Replay Error", "Failed to load replay data");
+    if (responseSessionId != sessionId) return;
+    
+    if (status != StatusCode::SUCCESS) {
+        ui->lblStatus->setText("Failed to load replay data");
+        QMessageBox::critical(this, "Error", "Failed to load replay data");
+        return;
+    }
+    
+    if (eventList.isEmpty()) {
+        ui->lblStatus->setText("No replay events found for this session");
         return;
     }
     
     gameMode = mode;
     events = eventList;
+    currentIndex = 0;
     
-    buildEventLog();
-    updateEventList();
+    QString modeStr = (gameMode == GameMode::ELIMINATION) ? "Elimination" : "Scoring";
+    ui->lblStatus->setText(QString("Loaded %1 questions - Mode: %2").arg(events.size()).arg(modeStr));
     
-    if (!events.isEmpty()) {
-        currentEventIndex = 0;
-        displayCurrentEvent();
+    displayQuestion(0);
+    updateNavigationButtons();
+}
+
+void ReplayWindow::displayQuestion(int index) {
+    if (index < 0 || index >= events.size()) return;
+    
+    currentIndex = index;
+    const ReplayEvent& event = events[index];
+    
+    ui->lblQuestionInfo->setText(QString("Question %1 of %2").arg(index + 1).arg(events.size()));
+    ui->lblQuestion->setText(QString::fromUtf8(event.question_content));
+    
+    ui->btnOptionA->setText(QString("A) %1").arg(QString::fromUtf8(event.options[0])));
+    ui->btnOptionB->setText(QString("B) %1").arg(QString::fromUtf8(event.options[1])));
+    ui->btnOptionC->setText(QString("C) %1").arg(QString::fromUtf8(event.options[2])));
+    ui->btnOptionD->setText(QString("D) %1").arg(QString::fromUtf8(event.options[3])));
+    
+    resetOptionStyles();
+    highlightSelectedOption(event.selected_option);
+    
+    QString responseInfo = QString("Your answer: Option %1 | Response time: %2 ms")
+        .arg(QChar('A' + event.selected_option - 1))
+        .arg(event.response_time_ms);
+    ui->lblResponseInfo->setText(responseInfo);
+    
+    updateNavigationButtons();
+}
+
+void ReplayWindow::highlightSelectedOption(uint8_t option) {
+    QString selectedStyle = "background:#9b59b6; color:white; font-size:14px; font-weight:bold; border:3px solid #2c3e50;";
+    
+    switch (option) {
+        case 1: ui->btnOptionA->setStyleSheet(selectedStyle); break;
+        case 2: ui->btnOptionB->setStyleSheet(selectedStyle); break;
+        case 3: ui->btnOptionC->setStyleSheet(selectedStyle); break;
+        case 4: ui->btnOptionD->setStyleSheet(selectedStyle); break;
     }
 }
 
-void ReplayWindow::buildEventLog() {
-    questions.clear();
-    
-    for (const auto& event : events) {
-        QuestionData& qdata = questions[event.question_id];
-        if (qdata.options.isEmpty()) {
-            qdata.questionId = event.question_id;
-        }
-        
-        qdata.playerAnswers[event.user_id] = event.selected_option;
-        qdata.playerResponseTimes[event.user_id] = event.response_time_ms;
-    }
+void ReplayWindow::resetOptionStyles() {
+    ui->btnOptionA->setStyleSheet("background:#e74c3c; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionB->setStyleSheet("background:#2980b9; color:white; font-size:14px; font-weight:bold;");
+    ui->btnOptionC->setStyleSheet("background:#f1c40f; color:black; font-size:14px; font-weight:bold;");
+    ui->btnOptionD->setStyleSheet("background:#27ae60; color:white; font-size:14px; font-weight:bold;");
 }
 
-void ReplayWindow::updateEventList() {
-    ui->lstEvents->clear();
-    
-    for (int i = 0; i < events.size(); ++i) {
-        const auto& event = events[i];
-        QString text = QString("Event %1: Q%2 at %3ms")
-            .arg(i + 1)
-            .arg(event.question_id)
-            .arg(event.timestamp_ms);
-        ui->lstEvents->addItem(text);
-    }
+void ReplayWindow::updateNavigationButtons() {
+    ui->btnPrev->setEnabled(currentIndex > 0);
+    ui->btnNext->setEnabled(currentIndex < events.size() - 1);
 }
 
-void ReplayWindow::displayCurrentEvent() {
-    if (currentEventIndex < 0 || currentEventIndex >= events.size()) {
-        ui->lblEventInfo->setText("No events to display");
-        return;
-    }
-    
-    const auto& event = events[currentEventIndex];
-    
-    QString difficultyStr;
-    if (event.difficulty == 1) difficultyStr = "Easy";
-    else if (event.difficulty == 2) difficultyStr = "Medium";
-    else if (event.difficulty == 3) difficultyStr = "Hard";
-    else difficultyStr = "Unknown";
-    
-    QString correctOptionStr = QString("Option %1").arg(QChar('A' + event.correct_option - 1));
-    QString selectedOptionStr = QString("Option %1").arg(QChar('A' + event.selected_option - 1));
-    bool isCorrect = (event.selected_option == event.correct_option);
-    
-    ui->lblEventInfo->setText(QString("Event %1 / %2 - %3 (%4) - Answered: %5 (Correct: %6) - %7ms")
-        .arg(currentEventIndex + 1)
-        .arg(events.size())
-        .arg(QString::fromUtf8(event.question_content, strlen(event.question_content)))
-        .arg(difficultyStr)
-        .arg(selectedOptionStr)
-        .arg(isCorrect ? "✓" : "✗")
-        .arg(event.response_time_ms));
-    
-    ui->lstEvents->setCurrentRow(currentEventIndex);
-    
-    const auto& qdata = questions[event.question_id];
-    ui->tblAnswers->setRowCount(0);
-    
-    int row = 0;
-    for (auto it = qdata.playerAnswers.begin(); it != qdata.playerAnswers.end(); ++it) {
-        uint32_t userId = it.key();
-        uint8_t answer = it.value();
-        uint32_t responseTime = qdata.playerResponseTimes.value(userId, 0);
-        
-        ui->tblAnswers->insertRow(row);
-        
-        auto* userItem = new QTableWidgetItem(QString::number(userId));
-        auto* ansItem = new QTableWidgetItem(QString("Option %1").arg(QChar('A' + answer - 1)));
-        auto* timeItem = new QTableWidgetItem(formatTime(responseTime));
-        
-        userItem->setFlags(userItem->flags() & ~Qt::ItemIsEditable);
-        ansItem->setFlags(ansItem->flags() & ~Qt::ItemIsEditable);
-        timeItem->setFlags(timeItem->flags() & ~Qt::ItemIsEditable);
-        
-        ui->tblAnswers->setItem(row, 0, userItem);
-        ui->tblAnswers->setItem(row, 1, ansItem);
-        ui->tblAnswers->setItem(row, 2, timeItem);
-        
-        ++row;
-    }
+void ReplayWindow::setPlaybackState(bool playing) {
+    isPlaying = playing;
+    ui->btnPlay->setEnabled(!playing);
+    ui->btnPause->setEnabled(playing);
 }
 
 void ReplayWindow::onPlayClicked() {
-    if (!isPlaying) {
-        playReplay();
-    }
+    if (events.isEmpty()) return;
+    setPlaybackState(true);
+    playbackTimer->start(2000);
 }
 
 void ReplayWindow::onPauseClicked() {
-    if (isPlaying) {
-        pauseReplay();
-    }
-}
-
-void ReplayWindow::onStopClicked() {
-    stopReplay();
-}
-
-void ReplayWindow::onNextEventClicked() {
-    if (currentEventIndex < events.size() - 1) {
-        currentEventIndex++;
-        displayCurrentEvent();
-    }
-}
-
-void ReplayWindow::onPrevEventClicked() {
-    if (currentEventIndex > 0) {
-        currentEventIndex--;
-        displayCurrentEvent();
-    }
-}
-
-void ReplayWindow::playReplay() {
-    isPlaying = true;
-    ui->btnPlay->setEnabled(false);
-    ui->btnPause->setEnabled(true);
-    playbackTimer->start(500);
-}
-
-void ReplayWindow::pauseReplay() {
-    isPlaying = false;
     playbackTimer->stop();
-    ui->btnPlay->setEnabled(true);
-    ui->btnPause->setEnabled(false);
+    setPlaybackState(false);
 }
 
-void ReplayWindow::stopReplay() {
-    isPlaying = false;
+void ReplayWindow::onNextClicked() {
+    if (currentIndex < events.size() - 1) {
+        displayQuestion(currentIndex + 1);
+    }
+}
+
+void ReplayWindow::onPrevClicked() {
+    if (currentIndex > 0) {
+        displayQuestion(currentIndex - 1);
+    }
+}
+
+void ReplayWindow::onCloseClicked() {
     playbackTimer->stop();
-    currentEventIndex = 0;
-    displayCurrentEvent();
-    ui->btnPlay->setEnabled(true);
-    ui->btnPause->setEnabled(false);
+    close();
 }
 
-void ReplayWindow::onReplayTick() {
-    if (isPlaying && currentEventIndex < events.size() - 1) {
-        currentEventIndex++;
-        displayCurrentEvent();
-    } else if (currentEventIndex >= events.size() - 1) {
-        pauseReplay();
+void ReplayWindow::onPlaybackTick() {
+    if (currentIndex < events.size() - 1) {
+        displayQuestion(currentIndex + 1);
+    } else {
+        playbackTimer->stop();
+        setPlaybackState(false);
     }
 }
 
 void ReplayWindow::onConnectionError(const QString& error) {
+    ui->lblStatus->setText("Connection error");
     QMessageBox::critical(this, "Connection Error", error);
 }
 
@@ -2563,7 +2605,7 @@ void ReplayWindow::onConnectionError(const QString& error) {
 
 ---
 
-##  ui/GameWindow.h 
+##  client/ui/GameWindow.h 
 
 ```cpp
 #pragma once
@@ -2573,6 +2615,7 @@ void ReplayWindow::onConnectionError(const QString& error) {
 #include <QElapsedTimer>
 #include <QVector>
 #include <QStringList>
+#include <QMap>
 #include "protocol.h"
 #include "../models/GameState.h"
 
@@ -2611,6 +2654,7 @@ private slots:
     void onReturnedToRoom();
     void onPauseGameClicked();
     void onResumeGameClicked();
+    void onQuitGameClicked();
 
 private:
     void setupUiTheme();
@@ -2648,16 +2692,22 @@ private:
     bool questionActive;
     bool answerSent;
     bool paused;
+    
+    // Track per-player statistics
+    QMap<uint32_t, uint32_t> playerCorrectAnswers;
+    QMap<uint32_t, QVector<uint32_t>> playerResponseTimes;
 
 signals:
     void returnedToRoom();
+    void stayInRoom();
+    void forfeitedGame();
 };
 
 ```
 
 ---
 
-##  ui/ReplayWindow.h 
+##  client/ui/ReplayWindow.h 
 
 ```cpp
 #pragma once
@@ -2665,9 +2715,7 @@ signals:
 #include <QMainWindow>
 #include <QTimer>
 #include <QVector>
-#include <QMap>
 #include "protocol.h"
-#include "../models/GameState.h"
 
 namespace Ui {
 class ReplayWindow;
@@ -2685,23 +2733,20 @@ public:
 private slots:
     void onReplayDataReceived(StatusCode status, uint32_t sessionId, GameMode mode, 
                              const QVector<ReplayEvent>& events);
-    void onReplayTick();
     void onPlayClicked();
     void onPauseClicked();
-    void onStopClicked();
-    void onNextEventClicked();
-    void onPrevEventClicked();
+    void onNextClicked();
+    void onPrevClicked();
+    void onCloseClicked();
+    void onPlaybackTick();
     void onConnectionError(const QString& error);
 
 private:
-    void setupUi();
-    void loadReplayData();
-    void playReplay();
-    void pauseReplay();
-    void stopReplay();
-    void displayCurrentEvent();
-    void updateEventList();
-    void buildEventLog();
+    void displayQuestion(int index);
+    void highlightSelectedOption(uint8_t option);
+    void resetOptionStyles();
+    void updateNavigationButtons();
+    void setPlaybackState(bool playing);
 
     Ui::ReplayWindow* ui;
     NetworkManager* networkManager;
@@ -2710,25 +2755,16 @@ private:
     GameMode gameMode;
     QVector<ReplayEvent> events;
     
-    int currentEventIndex;
+    int currentIndex;
     bool isPlaying;
     QTimer* playbackTimer;
-    
-    struct QuestionData {
-        uint32_t questionId;
-        QStringList options;
-        QMap<uint32_t, uint8_t> playerAnswers;
-        QMap<uint32_t, uint32_t> playerResponseTimes;
-    };
-    
-    QMap<uint32_t, QuestionData> questions;
 };
 
 ```
 
 ---
 
-##  ui/RoomWindow.cpp 
+##  client/ui/RoomWindow.cpp 
 
 ```cpp
 #include "RoomWindow.h"
@@ -2919,6 +2955,8 @@ void RoomWindow::onLeaveRoomClicked()
 
     if (reply == QMessageBox::Yes) {
         networkManager->sendLeaveRoom();
+        sessionState->setCurrentRoomId(0);
+        emit leftRoom();
         this->close();
     }
 }
@@ -2943,6 +2981,12 @@ void RoomWindow::onGameStarted()
     
     // Connect return-to-room signal
     connect(gameWindow, &GameWindow::returnedToRoom, this, &RoomWindow::onReturnedToRoom);
+    
+    // Connect stay-in-room signal  
+    connect(gameWindow, &GameWindow::stayInRoom, this, &RoomWindow::onStayInRoom);
+    
+    // Connect forfeit signal - player quits game and goes to main menu
+    connect(gameWindow, &GameWindow::forfeitedGame, this, &RoomWindow::onPlayerForfeit);
     
     this->hide();
     gameWindow->show();
@@ -3153,22 +3197,45 @@ void RoomWindow::stopCountdownTimer()
 
 void RoomWindow::onReturnedToRoom()
 {
-    // Close game window and show room window again
+    // Game ended and player is leaving - signal to parent to return to lobby
     if (gameWindow) {
         gameWindow->close();
         gameWindow = nullptr;
     }
     
-    // Reset local player ready state
+    // Emit signal that we're leaving the room
+    emit leftRoom();
+    this->close();
+}
+
+void RoomWindow::onPlayerForfeit()
+{
+    // Player forfeited game - close game window and return to main menu
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+    
+    // Emit signal that we're leaving the room (goes to main menu via lobby)
+    emit leftRoom();
+    this->close();
+}
+
+void RoomWindow::onStayInRoom()
+{
+    // Player chose to stay in room after game ends
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow = nullptr;
+    }
+    
+    // Reset ready status for next game
     isLocalPlayerReady = false;
-    ui->btnToggleReady->setText("Mark Ready");
     
-    // Show this window
+    // Show room window again
     this->show();
-    this->raise();
-    this->activateWindow();
     
-    // Restart auto-refresh to sync player list
+    // Restart auto-refresh to get updated player list
     setupAutoRefresh();
 }
 
@@ -3176,7 +3243,7 @@ void RoomWindow::onReturnedToRoom()
 
 ---
 
-##  ui/GameHistoryWindow.cpp 
+##  client/ui/GameHistoryWindow.cpp 
 
 ```cpp
 #include "GameHistoryWindow.h"
@@ -3274,7 +3341,155 @@ void GameHistoryWindow::onConnectionError(const QString& error) {
 
 ---
 
-##  ui/MainMenuWindow.cpp 
+##  client/ui/GameResultsWindow.cpp 
+
+```cpp
+#include "GameResultsWindow.h"
+#include "ui_GameResultsWindow.h"
+#include "../models/SessionState.h"
+#include <QTableWidgetItem>
+#include <QHeaderView>
+#include <QFont>
+
+GameResultsWindow::GameResultsWindow(const QVector<PlayerResult>& results,
+                                    GameEndReason endReason,
+                                    uint8_t winnerCount,
+                                    QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::GameResultsWindow)
+    , playerResults(results)
+    , gameEndReason(endReason)
+    , numWinners(winnerCount)
+{
+    ui->setupUi(this);
+    setupUI();
+    displayResults();
+}
+
+GameResultsWindow::~GameResultsWindow() {
+    delete ui;
+}
+
+void GameResultsWindow::setupUI() {
+    setWindowTitle("Game Results");
+    
+    // Configure results table
+    ui->tblResults->setColumnCount(6);
+    ui->tblResults->setHorizontalHeaderLabels({
+        "Rank", "Player", "Score", "Correct Answers", "Avg Response Time (ms)", "Status"
+    });
+    ui->tblResults->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tblResults->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->tblResults->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tblResults->setSelectionMode(QAbstractItemView::NoSelection);
+    
+    // Connect buttons
+    connect(ui->btnLeaveRoom, &QPushButton::clicked, this, &GameResultsWindow::onLeaveRoomClicked);
+    connect(ui->btnStayInRoom, &QPushButton::clicked, this, &GameResultsWindow::onStayInRoomClicked);
+    
+    // Set title
+    ui->lblTitle->setText(getEndReasonText());
+    
+    // Style the title
+    QFont titleFont = ui->lblTitle->font();
+    titleFont.setPointSize(16);
+    titleFont.setBold(true);
+    ui->lblTitle->setFont(titleFont);
+    ui->lblTitle->setAlignment(Qt::AlignCenter);
+}
+
+void GameResultsWindow::displayResults() {
+    SessionState* sessionState = &SessionState::instance();
+    uint32_t localUserId = sessionState->getUserId();
+    
+    ui->tblResults->setRowCount(0);
+    
+    for (const auto& result : playerResults) {
+        int row = ui->tblResults->rowCount();
+        ui->tblResults->insertRow(row);
+        
+        auto* rankItem = new QTableWidgetItem(QString::number(result.final_rank));
+        auto* nameItem = new QTableWidgetItem(result.display_name);
+        auto* scoreItem = new QTableWidgetItem(QString::number(result.final_score));
+        auto* correctItem = new QTableWidgetItem(QString::number(result.correct_answers));
+        auto* avgTimeItem = new QTableWidgetItem(QString::number(result.avg_response_time_ms));
+        
+        QString statusText;
+        if (result.is_winner) {
+            statusText = "🏆 Winner";
+        } else {
+            statusText = "Participant";
+        }
+        auto* statusItem = new QTableWidgetItem(statusText);
+        
+        // Highlight local player
+        if (result.user_id == localUserId) {
+            QFont boldFont;
+            boldFont.setBold(true);
+            rankItem->setFont(boldFont);
+            nameItem->setFont(boldFont);
+            scoreItem->setFont(boldFont);
+            correctItem->setFont(boldFont);
+            avgTimeItem->setFont(boldFont);
+            statusItem->setFont(boldFont);
+            
+            QColor highlightColor(255, 250, 205); // Light yellow
+            rankItem->setBackground(QBrush(highlightColor));
+            nameItem->setBackground(QBrush(highlightColor));
+            scoreItem->setBackground(QBrush(highlightColor));
+            correctItem->setBackground(QBrush(highlightColor));
+            avgTimeItem->setBackground(QBrush(highlightColor));
+            statusItem->setBackground(QBrush(highlightColor));
+        }
+        
+        // Highlight winners with gold background
+        if (result.is_winner) {
+            QColor winnerColor(255, 215, 0, 50); // Semi-transparent gold
+            rankItem->setBackground(QBrush(winnerColor));
+            nameItem->setBackground(QBrush(winnerColor));
+            scoreItem->setBackground(QBrush(winnerColor));
+            correctItem->setBackground(QBrush(winnerColor));
+            avgTimeItem->setBackground(QBrush(winnerColor));
+            statusItem->setBackground(QBrush(winnerColor));
+        }
+        
+        ui->tblResults->setItem(row, 0, rankItem);
+        ui->tblResults->setItem(row, 1, nameItem);
+        ui->tblResults->setItem(row, 2, scoreItem);
+        ui->tblResults->setItem(row, 3, correctItem);
+        ui->tblResults->setItem(row, 4, avgTimeItem);
+        ui->tblResults->setItem(row, 5, statusItem);
+    }
+}
+
+QString GameResultsWindow::getEndReasonText() const {
+    switch (gameEndReason) {
+        case GameEndReason::SINGLE_WINNER:
+            return "🎉 Game Over - We Have a Winner! 🎉";
+        case GameEndReason::DRAW:
+            return QString("🎉 Game Over - It's a Draw! (%1 Winners) 🎉").arg(numWinners);
+        case GameEndReason::NO_WINNER_WIPEOUT:
+            return "💥 Game Over - Total Wipeout! No Winners! 💥";
+        default:
+            return "Game Over";
+    }
+}
+
+void GameResultsWindow::onLeaveRoomClicked() {
+    emit leaveRoomRequested();
+    close();
+}
+
+void GameResultsWindow::onStayInRoomClicked() {
+    emit stayInRoomRequested();
+    close();
+}
+
+```
+
+---
+
+##  client/ui/MainMenuWindow.cpp 
 
 ```cpp
 #include "MainMenuWindow.h"
@@ -3282,6 +3497,7 @@ void GameHistoryWindow::onConnectionError(const QString& error) {
 #include "LobbyWindow.h"
 #include "ReplayWindow.h"
 #include "GameHistoryWindow.h"
+#include "SessionListDialog.h"
 #include "../network/NetworkManager.h"
 #include "../models/SessionState.h"
 #include <QMessageBox>
@@ -3378,6 +3594,9 @@ void MainMenuWindow::displayStats(const UserStatsResponse& stats) {
 
 void MainMenuWindow::onPlayClicked() {
     LobbyWindow* lobbyWindow = new LobbyWindow(this);
+    connect(lobbyWindow, &LobbyWindow::backToMainMenu, this, [this]() {
+        this->show();
+    });
     lobbyWindow->show();
     this->hide();
 }
@@ -3403,15 +3622,13 @@ void MainMenuWindow::onViewStatsClicked() {
 }
 
 void MainMenuWindow::onReplayClicked() {
-    bool ok;
-    uint32_t sessionId = QInputDialog::getInt(
-        this, "Replay Game", 
-        "Enter session ID to replay:", 
-        1, 1, 2147483647, 1, &ok);
-    
-    if (ok) {
-        ReplayWindow* replayWindow = new ReplayWindow(sessionId, this);
-        replayWindow->show();
+    SessionListDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        uint32_t sessionId = dialog.getSelectedSessionId();
+        if (sessionId > 0) {
+            ReplayWindow* replayWindow = new ReplayWindow(sessionId, this);
+            replayWindow->show();
+        }
     }
 }
 
@@ -3436,7 +3653,128 @@ QString MainMenuWindow::getTierName(uint32_t rankedPoints) const {
 
 ---
 
-##  ui/LoginWindow.cpp 
+##  client/ui/SessionListDialog.cpp 
+
+```cpp
+#include "SessionListDialog.h"
+#include "ui_SessionListDialog.h"
+#include "../network/NetworkManager.h"
+#include <QTableWidgetItem>
+#include <QHeaderView>
+#include <QDateTime>
+#include <QMessageBox>
+
+SessionListDialog::SessionListDialog(QWidget *parent)
+    : QDialog(parent)
+    , ui(new Ui::SessionListDialog)
+    , networkManager(&NetworkManager::instance())
+    , selectedSessionId(0)
+    , selectedRow(-1)
+{
+    ui->setupUi(this);
+    setWindowTitle("Select Game Session to Replay");
+    
+    // Configure table
+    ui->tblSessions->setColumnCount(5);
+    ui->tblSessions->setHorizontalHeaderLabels({
+        "Session ID", "Date", "Mode", "Score", "Rank"
+    });
+    ui->tblSessions->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tblSessions->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->tblSessions->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tblSessions->setSelectionMode(QAbstractItemView::SingleSelection);
+    
+    // Connect signals
+    connect(networkManager, &NetworkManager::gameHistoryResponse,
+            this, &SessionListDialog::onGameHistoryReceived);
+    connect(networkManager, &NetworkManager::connectionError,
+            this, &SessionListDialog::onConnectionError);
+    connect(ui->tblSessions, &QTableWidget::cellDoubleClicked,
+            this, &SessionListDialog::onSessionDoubleClicked);
+    connect(ui->btnOk, &QPushButton::clicked, this, &SessionListDialog::onOkClicked);
+    connect(ui->btnCancel, &QPushButton::clicked, this, &SessionListDialog::onCancelClicked);
+    
+    loadSessions();
+}
+
+SessionListDialog::~SessionListDialog() {
+    delete ui;
+}
+
+void SessionListDialog::loadSessions() {
+    ui->lblStatus->setText("Loading game sessions...");
+    ui->tblSessions->setRowCount(0);
+    networkManager->sendGetGameHistory();
+}
+
+void SessionListDialog::onGameHistoryReceived(StatusCode status, const QVector<GameHistoryEntry>& entries) {
+    if (status == StatusCode::SUCCESS) {
+        sessions = entries;
+        displaySessions(entries);
+    } else {
+        ui->lblStatus->setText("Failed to load game sessions");
+        QMessageBox::warning(this, "Error", "Failed to load game history");
+    }
+}
+
+void SessionListDialog::displaySessions(const QVector<GameHistoryEntry>& entries) {
+    ui->tblSessions->setRowCount(0);
+    
+    for (const auto& entry : entries) {
+        int row = ui->tblSessions->rowCount();
+        ui->tblSessions->insertRow(row);
+        
+        QDateTime dateTime = QDateTime::fromSecsSinceEpoch(entry.timestamp_sec);
+        QString dateStr = dateTime.toString("yyyy-MM-dd hh:mm");
+        
+        auto* idItem = new QTableWidgetItem(QString::number(entry.session_id));
+        auto* dateItem = new QTableWidgetItem(dateStr);
+        auto* modeItem = new QTableWidgetItem(QString::fromLatin1(entry.game_mode));
+        auto* scoreItem = new QTableWidgetItem(QString::number(entry.player_score));
+        auto* rankItem = new QTableWidgetItem(entry.player_rank > 0 ? QString::number(entry.player_rank) : "—");
+        
+        ui->tblSessions->setItem(row, 0, idItem);
+        ui->tblSessions->setItem(row, 1, dateItem);
+        ui->tblSessions->setItem(row, 2, modeItem);
+        ui->tblSessions->setItem(row, 3, scoreItem);
+        ui->tblSessions->setItem(row, 4, rankItem);
+    }
+    
+    ui->lblStatus->setText(QString("Found %1 game sessions").arg(entries.size()));
+}
+
+void SessionListDialog::onSessionDoubleClicked(int row, int /*column*/) {
+    if (row >= 0 && row < sessions.size()) {
+        selectedSessionId = sessions[row].session_id;
+        selectedRow = row;
+        accept();
+    }
+}
+
+void SessionListDialog::onOkClicked() {
+    int currentRow = ui->tblSessions->currentRow();
+    if (currentRow >= 0 && currentRow < sessions.size()) {
+        selectedSessionId = sessions[currentRow].session_id;
+        selectedRow = currentRow;
+        accept();
+    } else {
+        QMessageBox::information(this, "No Selection", "Please select a session to replay");
+    }
+}
+
+void SessionListDialog::onCancelClicked() {
+    reject();
+}
+
+void SessionListDialog::onConnectionError(const QString& error) {
+    QMessageBox::critical(this, "Connection Error", error);
+}
+
+```
+
+---
+
+##  client/ui/LoginWindow.cpp 
 
 ```cpp
 #include "LoginWindow.h"
@@ -3657,7 +3995,7 @@ void LoginWindow::clearError() {
 
 ---
 
-##  ui/GameHistoryWindow.h 
+##  client/ui/GameHistoryWindow.h 
 
 ```cpp
 #pragma once
@@ -3695,7 +4033,7 @@ private:
 
 ---
 
-##  ui/RoomWindow.h 
+##  client/ui/RoomWindow.h 
 
 ```cpp
 #ifndef ROOMWINDOW_H
@@ -3738,6 +4076,8 @@ private slots:
     void onPlayerLeft(uint32_t userId);
     void onPlayerReadyChanged(uint32_t userId, bool isReady);
     void onReturnedToRoom();
+    void onPlayerForfeit();
+    void onStayInRoom();
 
     // Network error
     void onNetworkError(const QString& error);
@@ -3779,9 +4119,114 @@ private:
     uint8_t countdownSecondsRemaining = 0;
     QVector<PlayerInfo> cachedPlayers;
     GameWindow *gameWindow = nullptr;
+
+signals:
+    void leftRoom();
 };
 
 #endif // ROOMWINDOW_H
+
+```
+
+---
+
+##  client/ui/GameResultsWindow.h 
+
+```cpp
+#pragma once
+
+#include <QMainWindow>
+#include <QVector>
+#include "protocol.h"
+
+namespace Ui {
+class GameResultsWindow;
+}
+
+struct PlayerResult {
+    uint32_t user_id;
+    QString display_name;
+    uint32_t final_score;
+    uint32_t final_rank;
+    uint32_t correct_answers;
+    uint32_t avg_response_time_ms;
+    bool is_winner;
+};
+
+class GameResultsWindow : public QMainWindow {
+    Q_OBJECT
+
+public:
+    explicit GameResultsWindow(const QVector<PlayerResult>& results, 
+                              GameEndReason endReason,
+                              uint8_t winnerCount,
+                              QWidget *parent = nullptr);
+    ~GameResultsWindow();
+
+signals:
+    void leaveRoomRequested();
+    void stayInRoomRequested();
+
+private slots:
+    void onLeaveRoomClicked();
+    void onStayInRoomClicked();
+
+private:
+    Ui::GameResultsWindow *ui;
+    QVector<PlayerResult> playerResults;
+    GameEndReason gameEndReason;
+    uint8_t numWinners;
+    
+    void setupUI();
+    void displayResults();
+    QString getEndReasonText() const;
+};
+
+```
+
+---
+
+##  client/ui/SessionListDialog.h 
+
+```cpp
+#pragma once
+
+#include <QDialog>
+#include <QVector>
+#include "protocol.h"
+
+namespace Ui {
+class SessionListDialog;
+}
+
+class NetworkManager;
+
+class SessionListDialog : public QDialog {
+    Q_OBJECT
+
+public:
+    explicit SessionListDialog(QWidget *parent = nullptr);
+    ~SessionListDialog();
+    
+    uint32_t getSelectedSessionId() const { return selectedSessionId; }
+
+private slots:
+    void onGameHistoryReceived(StatusCode status, const QVector<GameHistoryEntry>& entries);
+    void onConnectionError(const QString& error);
+    void onSessionDoubleClicked(int row, int column);
+    void onOkClicked();
+    void onCancelClicked();
+
+private:
+    void loadSessions();
+    void displaySessions(const QVector<GameHistoryEntry>& entries);
+    
+    Ui::SessionListDialog *ui;
+    NetworkManager *networkManager;
+    QVector<GameHistoryEntry> sessions;
+    uint32_t selectedSessionId;
+    int selectedRow;
+};
 
 ```
 

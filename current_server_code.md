@@ -1,5 +1,4 @@
 # Source Code Collection
-
 ## database_init.sql
 ``` sql
 -- schema.sql
@@ -109,7 +108,8 @@ target_link_libraries(server PRIVATE sqlite3 sqlite_modern_cpp bcrypt pthread dl
 target_include_directories(server PRIVATE ${THIRDPARTY_SOURCES})
 ```
 
-##  server/src/main.cpp 
+
+##  server/main.cpp 
 
 ```cpp
 #include "network/Server.h"
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
 
 ---
 
-##  server/src/database_init.cpp 
+##  server/database_init.cpp 
 
 ```cpp
 #include "db/DatabaseManager.h"
@@ -211,7 +211,7 @@ void initializeDatabase() {
 
 ---
 
-##  server/src/db/DatabaseManager.cpp 
+##  server/db/DatabaseManager.cpp 
 
 ```cpp
 #include "DatabaseManager.h"
@@ -288,7 +288,7 @@ std::optional<UserData> DatabaseManager::loginUser(const std::string& email, con
 
 ---
 
-##  server/src/db/QuestionRepository.cpp 
+##  server/db/QuestionRepository.cpp 
 
 ```cpp
 #include "QuestionRepository.h"
@@ -326,7 +326,7 @@ std::vector<Question> QuestionRepository::getRandomQuestions(int count) {
 
 ---
 
-##  server/src/db/UserRepository.h 
+##  server/db/UserRepository.h 
 
 ```cpp
 #pragma once
@@ -353,7 +353,7 @@ private:
 
 ---
 
-##  server/src/db/QuestionRepository.h 
+##  server/db/QuestionRepository.h 
 
 ```cpp
 #pragma once
@@ -379,7 +379,7 @@ public:
 
 ---
 
-##  server/src/db/DatabaseManager.h 
+##  server/db/DatabaseManager.h 
 
 ```cpp
 #pragma once
@@ -419,7 +419,7 @@ private:
 
 ---
 
-##  server/src/db/UserRepository.cpp 
+##  server/db/UserRepository.cpp 
 
 ```cpp
 #include "UserRepository.h"
@@ -429,8 +429,9 @@ private:
 
 UserStatsResponse UserRepository::getUserStats(uint32_t userId) {
     UserStatsResponse stats{};
-    // Default ranked points if no record found
     stats.ranked_points = 1000;
+    stats.total_ranked_players = 0;
+    stats.player_rank = 0;
 
     auto fillModeStats = [&](const std::string& mode, UserModeStats& out) {
         out.total_matches = 0;
@@ -483,6 +484,15 @@ UserStatsResponse UserRepository::getUserStats(uint32_t userId) {
 
         fillModeStats("Elimination", stats.elimination);
         fillModeStats("Scoring", stats.scoring);
+
+        db << "SELECT COUNT(*) FROM users WHERE ranked_points > 0"
+           >> stats.total_ranked_players;
+
+        db << "SELECT COUNT(*) FROM users WHERE ranked_points > ?"
+           << stats.ranked_points
+           >> stats.player_rank;
+        
+        stats.player_rank += 1;
     } catch (const std::exception &e) {
         std::cerr << "DB Error getting stats: " << e.what() << std::endl;
     }
@@ -502,7 +512,20 @@ void UserRepository::updateUserRanks(const std::vector<RankUpdateInfo>& results)
 
         for (const auto &p : results) {
             uint32_t elo = 1000;
-            db << "SELECT ranked_points FROM users WHERE id = ?" << p.user_id >> elo;
+            bool found = false;
+
+            db << "SELECT ranked_points FROM users WHERE id = ? " << p.user_id
+               >> [&](uint32_t points) {
+                   elo = points;
+                   found = true;
+               };
+               
+            if (!found) {
+                std::cerr << "User ID " << p.user_id << " not found. Aborting rank update." << std::endl;
+                db << "ROLLBACK; ";
+                return;
+            }
+
             currentElos.push_back(elo);
             totalElo += elo;
         }
@@ -540,7 +563,7 @@ void UserRepository::updateUserRanks(const std::vector<RankUpdateInfo>& results)
 
 ---
 
-##  server/src/game/Room.h 
+##  server/game/Room.h 
 
 ```cpp
 #pragma once
@@ -658,7 +681,7 @@ private:
 
 ---
 
-##  server/src/game/RoomManager.h 
+##  server/game/RoomManager.h 
 
 ```cpp
 #pragma once
@@ -690,7 +713,7 @@ private:
 
 ---
 
-##  server/src/game/RoomManager.cpp 
+##  server/game/RoomManager.cpp 
 
 ```cpp
 #include "RoomManager.h"
@@ -764,7 +787,7 @@ void RoomManager::updateAllRooms() {
 
 ---
 
-##  server/src/game/Room.cpp 
+##  server/game/Room.cpp 
 
 ```cpp
 #include <bits/stdc++.h>
@@ -855,7 +878,6 @@ bool Room::setPlayerReady(uint32_t userId, bool ready) {
 
     broadcast(MessageType::S2C_READY_STATUS_NOTIF, &notif, sizeof(notif));
 
-    // Auto-start disabled; wait for explicit C2S_START_GAME_REQ from host
     return true;
 }
 
@@ -956,7 +978,6 @@ void Room::broadcast(MessageType type, const void* data, uint32_t len, uint32_t 
     for (auto& pair : participants) {
         if (pair.first != excludeUserId) {
             pair.second.session->sendMsg(type, data, len);
-            // Immediately flush to avoid epoll edge-triggered issues
             pair.second.session->writeData();
         }
     }
@@ -1333,7 +1354,7 @@ void Room::terminateGame(TerminationReason reason) {
 
 ---
 
-##  server/src/network/ClientSession.cpp 
+##  server/network/ClientSession.cpp 
 
 ```cpp
 #include "ClientSession.h"
@@ -1454,6 +1475,18 @@ void ClientSession::handleMessage(const MessageHeader& header, const std::vector
         case MessageType::C2S_RESUME_GAME_REQ:
             if (state.isAuthenticated) handleResumeGame();
             break;
+        case MessageType::C2S_GET_REPLAY_REQ:
+            if (body.size() >= sizeof(GetReplayRequest))
+                handleGetReplay(reinterpret_cast<const GetReplayRequest*>(body.data()));
+            break;
+        case MessageType::C2S_GET_GAME_HISTORY_REQ:
+            if (state.isAuthenticated)
+                handleGetGameHistory();
+            break;
+        case MessageType::C2S_LEAVE_MATCH_REQ:
+            if (state.isAuthenticated)
+                handleForfeitGame();
+            break;
         default:
             break;
     }
@@ -1514,14 +1547,13 @@ void ClientSession::handleCreateRoom(const CreateRoomRequest* req){
         rsp.room_info = room->getRoomInfo();
         sendResponse(MessageType::S2C_CREATE_ROOM_RSP, &rsp, sizeof(rsp));
         
-        // Send host the full player list after room creation
         JoinRoomResponse playerListRsp{};
         playerListRsp.code = StatusCode::SUCCESS;
-        playerListRsp.room_info = room->getRoomInfo();  // ✅ Set room_info first
+        playerListRsp.room_info = room->getRoomInfo();
         playerListRsp.host_user_id = room->getHostId();
-        room->getPlayerList(playerListRsp);  // Populate player list
+        room->getPlayerList(playerListRsp);
         sendMsg(MessageType::S2C_JOIN_ROOM_RSP, &playerListRsp, sizeof(playerListRsp));
-        writeData(); // Flush immediately for consistency
+        writeData();
     }
 }
 
@@ -1686,11 +1718,163 @@ void ClientSession::handleResumeGame() {
         room->handleResumeGame(state.userId);
     }
 }
+
+void ClientSession::handleGetReplay(const GetReplayRequest* req) {
+    try {
+        auto &db = DatabaseManager::getInstance().getDb();
+        
+        std::vector<ReplayEvent> events;
+        GameMode mode = GameMode::ELIMINATION;
+
+        db << "SELECT game_mode FROM game_sessions WHERE id = ?"
+           << req->session_id
+           >> [&](const std::string& modeStr) {
+               mode = (modeStr == "Elimination") ? GameMode::ELIMINATION : GameMode::SCORING;
+           };
+
+        db << "SELECT gl.timestamp, gl.question_id, gl.user_id, gl.selected_option, "
+                  "gl.is_correct, gl.response_time_ms, "
+                  "q.content, q.option1, q.option2, q.option3, q.option4, "
+                  "q.correct_option, q.difficulty "
+              "FROM game_log gl "
+              "JOIN questions q ON gl.question_id = q.id "
+              "WHERE gl.session_id = ? AND gl.user_id = ? "
+              "ORDER BY gl.id ASC"
+           << req->session_id << state.userId
+           >> [&](const std::string& ts, uint32_t qid, uint32_t uid, int sel_opt,
+                  bool correct, uint32_t resp_ms,
+                  const std::string& content, const std::string& opt1,
+                  const std::string& opt2, const std::string& opt3,
+                  const std::string& opt4, int corr_opt, int diff) {
+               ReplayEvent event{};
+               event.timestamp_ms = resp_ms;
+               event.question_id = qid;
+               event.user_id = uid;
+               event.selected_option = static_cast<uint8_t>(sel_opt);
+               event.is_correct = correct;
+               event.response_time_ms = resp_ms;
+               event.correct_option = static_cast<uint8_t>(corr_opt);
+               event.difficulty = static_cast<uint8_t>(diff);
+
+               strncpy(event.question_content, content.c_str(), MAX_QUESTION_CONTENT_LEN - 1);
+               event.question_content[MAX_QUESTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[0], opt1.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[0][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[1], opt2.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[1][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[2], opt3.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[2][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+
+               strncpy(event.options[3], opt4.c_str(), MAX_OPTION_CONTENT_LEN - 1);
+               event.options[3][MAX_OPTION_CONTENT_LEN - 1] = '\0';
+               
+               events.push_back(event);
+           };
+        
+        ReplayDataResponse response{};
+        response.status = StatusCode::SUCCESS;
+        response.session_id = req->session_id;
+        response.game_mode = mode;
+        response.event_count = static_cast<uint32_t>(events.size());
+        
+        std::vector<uint8_t> payload;
+        payload.resize(sizeof(ReplayDataResponse) + events.size() * sizeof(ReplayEvent));
+        
+        memcpy(payload.data(), &response, sizeof(ReplayDataResponse));
+        memcpy(payload.data() + sizeof(ReplayDataResponse), events.data(), events.size() * sizeof(ReplayEvent));
+        
+        sendResponse(MessageType::S2C_GET_REPLAY_RSP, payload.data(), payload.size());
+    } catch (std::exception &e) {
+        std::cerr << "DB Error getting replay: " << e.what() << std::endl;
+        ReplayDataResponse errorResponse{};
+        errorResponse.status = StatusCode::FAILURE_GENERIC;
+        errorResponse.session_id = req->session_id;
+        errorResponse.game_mode = GameMode::ELIMINATION;
+        errorResponse.event_count = 0;
+        sendResponse(MessageType::S2C_GET_REPLAY_RSP, &errorResponse, sizeof(errorResponse));
+    }
+}
+
+void ClientSession::handleGetGameHistory() {
+    GameHistoryResponse response{};
+    response.status = StatusCode::SUCCESS;
+    response.entry_count = 0;
+
+    try {
+        auto &db = DatabaseManager::getInstance().getDb();
+
+        db << "SELECT sp.session_id, gs.game_mode, sp.score, sp.rank, "
+                  "IFNULL(SUM(CASE WHEN gl.is_correct = 1 THEN 1 ELSE 0 END), 0), "
+                  "COUNT(DISTINCT gl.question_id), "
+                  "IFNULL(AVG(gl.response_time_ms), 0), "
+                  "unixepoch(gs.created_at) "
+              "FROM session_participants sp "
+              "JOIN game_sessions gs ON sp.session_id = gs.id "
+              "LEFT JOIN game_log gl ON sp.session_id = gl.session_id AND sp.user_id = gl.user_id "
+              "WHERE sp.user_id = ? "
+              "GROUP BY sp.session_id, gs.created_at "
+              "ORDER BY gs.created_at DESC "
+              "LIMIT 100"
+           << state.userId
+           >> [&](uint32_t sid, const std::string& mode, uint32_t score, int rank,
+                  int correct, int total, double avg_time, uint64_t timestamp) {
+               if (response.entry_count < 100) {
+                   auto& entry = response.entries[response.entry_count++];
+                   entry.session_id = sid;
+                   entry.player_score = score;
+                   entry.player_rank = (rank > 0) ? rank : 0;
+                   entry.correct_answers = correct;
+                   entry.total_questions = total;
+                   entry.avg_response_time_ms = static_cast<uint32_t>(avg_time);
+                   entry.timestamp_sec = timestamp;
+                   
+                   strncpy(entry.game_mode, mode.c_str(), sizeof(entry.game_mode) - 1);
+                   entry.game_mode[sizeof(entry.game_mode) - 1] = '\0';
+               }
+           };
+
+        sendResponse(MessageType::S2C_GET_GAME_HISTORY_RSP, &response, sizeof(response));
+    } catch (const std::exception &e) {
+        std::cerr << "DB Error getting game history: " << e.what() << std::endl;
+        response.status = StatusCode::FAILURE_GENERIC;
+        sendResponse(MessageType::S2C_GET_GAME_HISTORY_RSP, &response, sizeof(response));
+    }
+}
+
+void ClientSession::handleForfeitGame() {
+    if (state.currentRoomId == 0) return;
+    
+    Room* room = server->getRoomManager()->getRoom(state.currentRoomId);
+    if (!room) return;
+    
+    const int32_t ELO_PENALTY = 100;
+    
+    try {
+        auto& db = DatabaseManager::getInstance().getDb();
+        
+        db << "UPDATE users SET ranked_points = MAX(0, ranked_points - ?) WHERE id = ?"
+           << ELO_PENALTY << state.userId;
+        
+        std::cout << "Player " << state.displayName << " forfeited game. ELO penalty: -" 
+                  << ELO_PENALTY << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "DB Error applying forfeit penalty: " << e.what() << std::endl;
+    }
+    
+    GameTerminatedNotification notif{};
+    notif.reason = TerminationReason::HOST_LEFT; 
+    sendResponse(MessageType::S2C_GAME_TERMINATED_NOTIF, &notif, sizeof(notif));
+    
+    handleLeaveRoom();
+}
 ```
 
 ---
 
-##  server/src/network/Server.h 
+##  server/network/Server.h 
 
 ```cpp
 #pragma once
@@ -1725,7 +1909,7 @@ private:
 
 ---
 
-##  server/src/network/Server.cpp 
+##  server/network/Server.cpp 
 
 ```cpp
 #include "Server.h"
@@ -1855,7 +2039,7 @@ void Server::handleAccept() {
 
 ---
 
-##  server/src/network/ClientSession.h 
+##  server/network/ClientSession.h 
 
 ```cpp
 #pragma once
@@ -1906,6 +2090,9 @@ private:
     void handleGetStats();
     void handlePauseGame();
     void handleResumeGame();
+    void handleGetReplay(const GetReplayRequest* req);
+    void handleGetGameHistory();
+    void handleForfeitGame();
 
     void sendResponse(MessageType type, const void* data, uint32_t len);
 
@@ -1922,7 +2109,7 @@ private:
 
 ---
 
-##  server/src/utils/PasswordUtils.h 
+##  server/utils/PasswordUtils.h 
 
 ```cpp
 #include <iostream>
@@ -1931,7 +2118,7 @@ private:
 
 ---
 
-##  server/src/utils/Logger.h 
+##  server/utils/Logger.h 
 
 ```cpp
 #include <iostream>
