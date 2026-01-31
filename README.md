@@ -1,4 +1,4 @@
-# Quiz Game — Quick Start (Linux)
+# Quiz Game with Qt and POSIX socket
 
 🎯 **Purpose** — Build and run the server and the Qt client locally on Linux (Ubuntu/Debian). This README has concise dependency, build, DB init, run, and quick tests (replay & quit behavior).
 
@@ -105,3 +105,11 @@ Notes:
 - Default server port: **10002** (changeable via `./server <port>`)
 - DB file: `server/game_db.db`
 - If you push these changes, mention in the commit / PR that replay payloads were changed to dynamic size (clients and servers need to be in sync).
+
+
+---
+
+## Authors
+Group 3 - IT4062 - 161265 in Hanoi University of Science and Technology
+1. Phan Hoàng Hải - ToJupiter
+2. Nguyễn Minh Khôi - 19010853
