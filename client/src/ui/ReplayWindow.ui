@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ReplayWindow</class>
+ <widget class="QMainWindow" name="ReplayWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Game Replay</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QMainWindow { background: #1a1a2e; }</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>15</number>
+    </property>
+    <property name="margin">
+     <number>20</number>
+    </property>
+    <item>
+     <widget class="QLabel" name="lblStatus">
+      <property name="text">
+       <string>Loading...</string>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: #3498db; font-size: 14px; font-weight: bold;</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="lblQuestionInfo">
+      <property name="text">
+       <string>Question 0 of 0</string>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: #ecf0f1; font-size: 16px; font-weight: bold;</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="lblQuestion">
+      <property name="text">
+       <string>Question text will appear here</string>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: white; font-size: 20px; font-weight: bold; background: #16213e; padding: 30px; border-radius: 10px;</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+      </property>
+      <property name="minimumHeight">
+       <number>100</number>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <layout class="QGridLayout" name="gridOptions">
+      <property name="spacing">
+       <number>10</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QPushButton" name="btnOptionA">
+        <property name="text">
+         <string>A) Option A</string>
+        </property>
+        <property name="minimumHeight">
+         <number>60</number>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="btnOptionB">
+        <property name="text">
+         <string>B) Option B</string>
+        </property>
+        <property name="minimumHeight">
+         <number>60</number>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QPushButton" name="btnOptionC">
+        <property name="text">
+         <string>C) Option C</string>
+        </property>
+        <property name="minimumHeight">
+         <number>60</number>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="btnOptionD">
+        <property name="text">
+         <string>D) Option D</string>
+        </property>
+        <property name="minimumHeight">
+         <number>60</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QLabel" name="lblResponseInfo">
+      <property name="text">
+       <string>Your answer: - | Response time: - ms</string>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: #bdc3c7; font-size: 14px; font-style: italic;</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="layoutControls">
+      <property name="spacing">
+       <number>10</number>
+      </property>
+      <item>
+       <widget class="QPushButton" name="btnPrev">
+        <property name="text">
+         <string>◀ Previous</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background: #9b59b6; color: white; font-weight: bold; padding: 10px 20px; border-radius: 5px;</string>
+        </property>
+        <property name="minimumWidth">
+         <number>120</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnPlay">
+        <property name="text">
+         <string>▶ Play</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background: #27ae60; color: white; font-weight: bold; padding: 10px 20px; border-radius: 5px;</string>
+        </property>
+        <property name="minimumWidth">
+         <number>100</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnPause">
+        <property name="text">
+         <string>⏸ Pause</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background: #f39c12; color: white; font-weight: bold; padding: 10px 20px; border-radius: 5px;</string>
+        </property>
+        <property name="minimumWidth">
+         <number>100</number>
+        </property>
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnNext">
+        <property name="text">
+         <string>Next ▶</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background: #3498db; color: white; font-weight: bold; padding: 10px 20px; border-radius: 5px;</string>
+        </property>
+        <property name="minimumWidth">
+         <number>120</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnClose">
+        <property name="text">
+         <string>✕ Close</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background: #c0392b; color: white; font-weight: bold; padding: 10px 20px; border-radius: 5px;</string>
+        </property>
+        <property name="minimumWidth">
+         <number>100</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
